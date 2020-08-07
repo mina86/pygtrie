@@ -256,18 +256,15 @@ class _Node(object):
             correspondence between original nodes in the trie and constructed
             nodes (see make_test_node_and_compress in test.py).
         """
-        def children():
-            """Recursively traverses all of node's children."""
-            for step, node in iteritems(self.children):
-                yield node.traverse(node_factory, path_conv, path + [step],
-                                    iteritems)
+        children = self.children and (
+            node.traverse(node_factory, path_conv, path + [step], iteritems)
+            for step, node in iteritems(self.children))
 
-        args = [path_conv, tuple(path), children()]
-
+        value_maybe = ()
         if self.value is not _EMPTY:
-            args.append(self.value)
+            value_maybe = (self.value,)
 
-        return node_factory(*args)
+        return node_factory(path_conv, tuple(path), children, *value_maybe)
 
     def equals(self, other):
         """Returns whether this and other node are recursively equal."""
@@ -470,7 +467,7 @@ class Trie(_abc.MutableMapping):
         """Removes all the values from the trie."""
         self._root = _Node()
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs):  # pylint: disable=signature-differs
         """Updates stored values.  Works like :meth:`dict.update`."""
         if len(args) > 1:
             raise ValueError('update() takes at most one positional argument, '
@@ -1346,18 +1343,25 @@ class Trie(_abc.MutableMapping):
         iterable of children nodes constructed by node_factory, optional value
         is the value associated with the path.
 
-        node_factory's children argument is a generator which has a few
+        node_factory's children argument is an iterator which has a few
         consequences:
 
-        * To traverse into node's children, the generator must be iterated over.
+        * To traverse into node's children, the object must be iterated over.
           This can by accomplished by a simple ``children = list(children)``
           statement.
         * Ignoring the argument allows node_factory to stop the traversal from
           going into the children of the node.  In other words, whole subtries
           can be removed from traversal if node_factory chooses so.
-        * If children is stored as is (i.e. as a generator) when it is iterated
-          over later on it will see state of the trie as it is during the
-          iteration and not when traverse method was called.
+        * If children is stored as is (i.e. as a iterator) when it is iterated
+          over later on it may see an inconsistent state of the trie if it has
+          changed between invocation of this method and the iteration.
+
+        However, to allow constant-time determination whether the node has
+        children or not, the iterator implements bool conversion such that
+        ``has_children = bool(children)`` will tell whether node has children
+        without iterating over them.  (Note that ``bool(children)`` will
+        continue returning ``True`` even if the iterator has been iterated
+        over).
 
         :func:`Trie.traverse` has two advantages over :func:`Trie.iteritems` and
         similar methods:
@@ -1474,12 +1478,13 @@ class Trie(_abc.MutableMapping):
         Returns:
             Node object constructed by node_factory corresponding to the root
             node.
-
         """
         node, _ = self._get_node(prefix)
         return node.traverse(node_factory, self._key_from_path,
                              list(self.__path_from_key(prefix)),
                              self._iteritems)
+
+    traverse.uses_bool_convertible_children = True
 
 class CharTrie(Trie):
     """A variant of a :class:`pygtrie.Trie` which accepts strings as keys.

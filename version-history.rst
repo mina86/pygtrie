@@ -1,6 +1,20 @@
 Version History
 ---------------
 
+2.4.0: TBD
+
+- Change ``children`` argument of the ``node_factory`` passed to
+  :func:`Trie.traverse` from a generator to an iterator with a custom
+  bool conversion.  This allows checking whether node has children
+  without having to iterate over them (``bool(children)``)
+
+  To test whether this feature is available, one can check whether
+  :const:`Trie.traverse.uses_bool_convertible_children` property is
+  true, e.g.: ``getattr(pygtrie.Trie.traverse,
+  'uses_bool_convertible_children', False)``.
+
+  [Thanks to Pallab Pain fo suggesting the feature]
+
 2.3.3: 2020/04/04
 
 - Fix to ‘:class:`AttributeError`: ``_NoChildren`` object has no
@@ -8,8 +22,8 @@ Version History
   sorting enabled.  [Thanks to Pallab Pain for reporting]
 
 - Add ``value`` property setter to step objects returned by
-  :func:`pygtrie.Trie.walk_towards` et al.  This deprecate ``set``
-  method.
+  :func:`pygtrie.Trie.walk_towards` et al.  This deprecates the
+  ``set`` method.
 
 - The module now exports :const:`pygtrie.__version__` making it
   possible to determine version of the library at run-time.

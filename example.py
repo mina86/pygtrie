@@ -72,7 +72,7 @@ prefixes['/baz'] = lambda url: sys.stdout.write('Baz handler: %s\n' % url)
 for url in ('/', '/foo', '/foot', '/foobar', 'invalid', '/foobarbaz', '/ba'):
     key, handler = prefixes.longest_prefix(url)
     if key is not None:
-        handler(url)
+        handler(url)  # It is callable, stfu pylint: disable=not-callable
     else:
         print('Unable to handle', repr(url))
 

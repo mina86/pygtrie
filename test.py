@@ -848,20 +848,28 @@ class SortTest(unittest.TestCase):
 @_TrieFactoryParameteriser()
 class TraverseTest(unittest.TestCase):
     _SENTINEL = object()
-    _TestNode = collections.namedtuple('TestNode', 'key children value')
+    _TestNode = collections.namedtuple('TestNode',
+                                       'key has_children children value')
 
     @classmethod
     def _make_test_node(cls, path_conv, path, children, value=_SENTINEL):
-        return cls._TestNode(path_conv(path), sorted(children), value)
+        has_children = bool(children)
+        return cls._TestNode(
+            path_conv(path), has_children, sorted(children), value)
 
     def assertNode(self, node, key, children=0, value=_SENTINEL):  # pylint: disable=invalid-name
         self.assertTrue(node)
         self.assertEqual(key, node.key)
+        self.assertEqual(bool(children), node.has_children)
         self.assertEqual(children, len(node.children))
         self.assertEqual(value, node.value)
         return node
 
     def _do_test_traverse_empty_tree(self, trie_factory):
+        self.assertTrue(pygtrie.Trie.traverse.uses_bool_convertible_children)
+        self.assertTrue(getattr(pygtrie.Trie.traverse,
+                                'uses_bool_convertible_children', None))
+
         t = trie_factory(pygtrie.CharTrie, {})
         r = t.traverse(self._make_test_node)
         self.assertNode(r, '', 0)
@@ -909,7 +917,8 @@ class TraverseTest(unittest.TestCase):
                 # There is only one prefix.
                 return children[0]
             else:
-                return self._TestNode(path_conv(path), children, value)
+                return self._TestNode(
+                    path_conv(path), bool(children), children, value)
 
         r = t.traverse(make)
         # Result:
@@ -943,7 +952,8 @@ class TraverseTest(unittest.TestCase):
                 return None
             else:
                 children = [ch for ch in children if ch is not None]
-                return self._TestNode(path_conv(path), children, value)
+                return self._TestNode(
+                    path_conv(path), bool(children), children, value)
 
         r = t.traverse(make)
         # Result:
