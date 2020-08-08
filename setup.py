@@ -111,13 +111,28 @@ class BuildPyCommand(CommandMixin, distutils.command.build_py.build_py):
     pass
 
 
-release = version.get_version()
+def get_readme_lines():
+    with codecs.open('README.rst', 'r', 'utf-8') as fd:
+        skip = False
+        skip_start = re.compile(r'^\.\. image:: https://'
+                                r'(?:readthedocs\.org|api\.travis-ci\.com)/')
+        for line in fd:
+            if skip:
+                skip = bool(line.strip())
+            elif skip_start.search(line):
+                skip = True
+            else:
+                yield line
 
-with codecs.open('README.rst', 'r', 'utf-8') as f:
-    readme = f.read()
-with codecs.open('version-history.rst', 'r', 'utf-8') as f:
-    readme += '\n' + f.read()
-readme, _ = re.subn(r':(?:class|func|const):`([^`]*)`', r'``\1``', readme)
+    with codecs.open('version-history.rst', 'r', 'utf-8') as fd:
+        yield ''
+        version_history = fd.read()
+        version_history, _ = re.subn(
+            r':(?:class|func|const):`([^`]*)`', r'``\1``', version_history)
+        yield version_history
+
+readme = ''.join(get_readme_lines())
+release = version.get_version()
 
 
 kwargs = {
