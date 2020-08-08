@@ -66,8 +66,8 @@ class CommandMixin(object):
             raise DistutilsFileError(
                   "could not write to '%s': %s" % (dst, e.strerror))
 
-    def copy_file(self, src, dst, preserve_mode=1, preserve_times=1, update=0,
-                  link=None, verbose=1, dry_run=0):
+    def copy_file(self, src, dst, preserve_mode=1, preserve_times=1, link=None,
+                  level=1):
         m = None
         if src.endswith('.py'):
             data, st = self._read_and_stat(src)
@@ -77,8 +77,7 @@ class CommandMixin(object):
         if not m:
             return super(CommandMixin, self).copy_file(
                     src, dst, preserve_mode=preserve_mode,
-                    preserve_times=preserve_times, update=update, link=link,
-                    verbose=verbose, dry_run=dry_run)
+                    preserve_times=preserve_times, link=link)
 
         if os.path.isdir(dst):
             dir = dst
@@ -86,12 +85,12 @@ class CommandMixin(object):
         else:
             dir = os.path.dirname(dst)
 
-        if verbose >= 1:
+        if self.verbose:
             from distutils import log
             snd = dir if os.path.basename(dst) == os.path.basename(src) else dst
             log.info("generating %s -> %s", src, snd)
 
-        if not dry_run:
+        if not self.dry_run:
             self._write(dst,
                         data[:m.start(0)],
                         '__version__ = ',
