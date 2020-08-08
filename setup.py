@@ -2,6 +2,7 @@ import codecs
 import distutils.command.build_py
 import distutils.command.sdist
 import distutils.core
+import packaging.version
 import os
 import os.path
 import re
@@ -124,14 +125,20 @@ def get_readme_lines():
             else:
                 yield line
 
-    with codecs.open('version-history.rst', 'r', 'utf-8') as fd:
-        yield ''
-        version_history = fd.read()
-        version_history, _ = re.subn(
-            r':(?:class|func|const):`([^`]*)`', r'``\1``', version_history)
-        yield version_history
+    yield ''
 
-readme = ''.join(get_readme_lines())
+    with codecs.open('version-history.rst', 'r', 'utf-8') as fd:
+        min_version = packaging.version.parse('1.0')
+        version_re = re.compile(r'^- ([0-9.]*):')
+        cleanup_re = re.compile(r':(?:class|func|const):`([^`]*)`')
+        for line in fd:
+            m = version_re.search(line)
+            if m and packaging.version.parse(m.group(1)) < min_version:
+                break
+            line, _ = cleanup_re.subn(r'``\1``', line)
+            yield line
+
+readme = ''.join(get_readme_lines()).rstrip()
 release = version.get_version()
 
 
