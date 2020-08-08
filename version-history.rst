@@ -1,7 +1,7 @@
 Version History
 ---------------
 
-2.4.0: TBD
+2.4.0: 2020/11/19
 
 - Change ``children`` argument of the ``node_factory`` passed to
   :func:`Trie.traverse` from a generator to an iterator with a custom

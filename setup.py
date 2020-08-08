@@ -125,10 +125,10 @@ def get_readme_lines():
             else:
                 yield line
 
-    yield ''
+    yield '\n'
 
     with codecs.open('version-history.rst', 'r', 'utf-8') as fd:
-        min_version = packaging.version.parse('1.0')
+        min_version = packaging.version.parse('2.0')
         version_re = re.compile(r'^- ([0-9.]*):')
         cleanup_re = re.compile(r':(?:class|func|const):`([^`]*)`')
         for line in fd:
@@ -145,7 +145,8 @@ release = version.get_version()
 kwargs = {
     'name': 'pygtrie',
     'version': release,
-    'description': 'Trie data structure implementation.',
+    'description': 'A pure Python trie data structure implementation.',
+    'long_description_content_type': 'text/x-rst',
     'long_description': readme,
     'author': 'Michal Nazarewicz',
     'author_email': 'mina86@mina86.com',
