@@ -44,26 +44,28 @@ Version History
 
 - Fix to :func:`pygtrie.Trie.copy` method not preserving
   enable-sorting flag and, in case of :class:`pygtrie.StringTrie`,
-  ``separator`` property.  Related to this, add support for the
-  ``copy`` module so :func:`copy.copy` can now be used with the
-  objects.
+  ``separator`` property.
 
-- Leafs and nodes with just one child use more mummery-optimised
+- Add support for the ``copy`` module so :func:`copy.copy` can now be
+  used with trie objects.
+
+- Leafs and nodes with just one child use more memory-optimised
   representation which reduces overall memory usage of a trie
   structure.
 
 - Minor performance improvement for adding new elements to
   a :class:`pygtrie.PrefixSet`.
 
-- Improvements to string representation of objects which now include
+- Improvements to string representation of objects which now includes
   type and, for :class:`pygtrie.StringTrie` object, value of separator
   property.
 
 2.3: 2018/08/10
 
-- New ``walk_towards`` method allows walking a path towards given
-  a node with given key accessing each step of the path.  Compared to
-  prefixes method, steps for nodes without assigned values are
+- New :func:`pygtrie.Trie.walk_towards` method allows walking a path
+  towards a node with given key accessing each step of the path.
+  Compared to :func:`pygtrie.Trie.walk_prefixes` method, steps for
+  nodes without assigned values are returned.
 
 - Fix to :func:`pygtrie.PrefixSet.copy` not preserving type of backing
   trie.
@@ -86,7 +88,7 @@ Version History
 
 - Value returend by :func:`pygtrie.Trie.shortest_prefix` and
   :func:`pygtrie.Trie.longest_prefix` evaluates to false if no prefix was
-  found.  This is in addition to it being a pair of Nones of course.
+  found.  This is in addition to it being a pair of `None`s of course.
 
 2.0: 2016/07/06
 
@@ -100,7 +102,7 @@ Version History
   method can be used to implement other serialisation methods such as
   JSON.
 
-1.2: 2016/06/21  [pulled back from PyPi]
+1.2: 2016/06/21  [pulled back from PyPI]
 
 - Tries can now be pickled.
 
@@ -110,7 +112,7 @@ Version History
 
 1.1: 2016/01/18
 
-- Fixed PyPi installation issues; all should work now.
+- Fixed PyPI installation issues; all should work now.
 
 1.0: 2015/12/16
 
