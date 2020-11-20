@@ -13,7 +13,7 @@ Version History
   true, e.g.: ``getattr(pygtrie.Trie.traverse,
   'uses_bool_convertible_children', False)``.
 
-  [Thanks to Pallab Pain fo suggesting the feature]
+  [Thanks to Pallab Pain for suggesting the feature]
 
 2.3.3: 2020/04/04
 
@@ -86,9 +86,10 @@ Version History
 
 - The library is now Python 3 compatible.
 
-- Value returend by :func:`pygtrie.Trie.shortest_prefix` and
-  :func:`pygtrie.Trie.longest_prefix` evaluates to false if no prefix was
-  found.  This is in addition to it being a pair of `None`s of course.
+- Value returned by :func:`pygtrie.Trie.shortest_prefix` and
+  :func:`pygtrie.Trie.longest_prefix` evaluates to false if no prefix
+  was found.  This is in addition to it being a pair of ``None``\ s of
+  course.
 
 2.0: 2016/07/06
 
