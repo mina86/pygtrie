@@ -2,7 +2,6 @@ import codecs
 import distutils.command.build_py
 import distutils.command.sdist
 import distutils.core
-import packaging.version
 import os
 import os.path
 import re
@@ -128,12 +127,12 @@ def get_readme_lines():
     yield '\n'
 
     with codecs.open('version-history.rst', 'r', 'utf-8') as fd:
-        min_version = packaging.version.parse('2.0')
-        version_re = re.compile(r'^- ([0-9.]*):')
+        min_major_version = 2
+        version_re = re.compile(r'^([0-9]+)\.[0-9.]+:')
         cleanup_re = re.compile(r':(?:class|func|const):`([^`]*)`')
         for line in fd:
             m = version_re.search(line)
-            if m and packaging.version.parse(m.group(1)) < min_version:
+            if m and int(m.group(1)) < min_major_version:
                 break
             line, _ = cleanup_re.subn(r'``\1``', line)
             yield line
@@ -146,7 +145,6 @@ kwargs = {
     'name': 'pygtrie',
     'version': release,
     'description': 'A pure Python trie data structure implementation.',
-    'long_description_content_type': 'text/x-rst',
     'long_description': readme,
     'author': 'Michal Nazarewicz',
     'author_email': 'mina86@mina86.com',

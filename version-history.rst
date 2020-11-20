@@ -1,7 +1,13 @@
 Version History
 ---------------
 
-2.4.0: 2020/11/19
+2.4.1: 2020/11/20
+
+- Remove dependency on ``packaging`` module from ``setup.py`` to fix
+  installation on systems without that package.  [Thanks to Eric
+  McLachlan for reporting]
+
+2.4.0: 2020/11/19  [pulled back from PyPi]
 
 - Change ``children`` argument of the ``node_factory`` passed to
   :func:`Trie.traverse` from a generator to an iterator with a custom
