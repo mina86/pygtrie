@@ -36,7 +36,7 @@ class BuildDocCommand(distutils.core.Command):
                 shutil.rmtree(outdir)
 
 
-class CommandMixin(object):
+class CommandMixin:
     @classmethod
     def _read_and_stat(cls, src):
         from distutils.errors import DistutilsFileError
@@ -75,8 +75,10 @@ class CommandMixin(object):
                           data, re.MULTILINE)
 
         if not m:
-            return super(CommandMixin, self).copy_file(
-                    src, dst, preserve_mode=preserve_mode,
+            # Not using super() for better Python 2.x compatibility (distutils
+            # uses old-style classes).
+            return distutils.core.Command.copy_file(
+                    self, src, dst, preserve_mode=preserve_mode,
                     preserve_times=preserve_times, link=link)
 
         if os.path.isdir(dst):

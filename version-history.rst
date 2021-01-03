@@ -1,10 +1,17 @@
 Version History
 ---------------
 
+2.4.2: 2021/01/03
+
+- Remove use of ‘super’ in ``setup.py`` to fix compatibility with
+  Python 2.7.  This changes build code only; no changes to the library
+  itself.
+
 2.4.1: 2020/11/20
 
 - Remove dependency on ``packaging`` module from ``setup.py`` to fix
-  installation on systems without that package.  [Thanks to Eric
+  installation on systems without that package.  This changes build
+  code only; no changes to the library itself.  [Thanks to Eric
   McLachlan for reporting]
 
 2.4.0: 2020/11/19  [pulled back from PyPi]
