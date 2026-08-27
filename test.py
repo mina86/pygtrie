@@ -12,8 +12,11 @@ import collections
 import copy
 import pickle
 import unittest
+import warnings
 
 import pygtrie
+
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 # pylint: disable=missing-docstring,too-few-public-methods
 
@@ -370,10 +373,14 @@ class TrieTestCase(unittest.TestCase):
             if expected[0]:
                 self.assertTrue(got)
             else:
+                def set_value():
+                    got.value = 10
+
                 self.assertFalse(got)
                 self.assertFalse(got.is_set)
                 self.assertFalse(got.has_subtrie)
                 self.assertIsNone(got.get())
+                self.assertRaisesRegex(AttributeError, 'read only', set_value)
 
         assert_pair(short_pair, t.shortest_prefix(self._VERY_LONG_KEY))
         assert_pair(short_pair, t.shortest_prefix(self._LONG_KEY))

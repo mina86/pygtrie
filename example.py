@@ -64,21 +64,17 @@ print('\nStoring URL handlers map')
 print('========================\n')
 
 prefixes = pygtrie.CharTrie()
-prefixes['/'] = lambda url: sys.stdout.write('Root handler: %s\n' % url)
-prefixes['/foo'] = lambda url: sys.stdout.write('Foo handler: %s\n' % url)
-prefixes['/foobar'] = lambda url: sys.stdout.write('FooBar handler: %s\n' % url)
-prefixes['/baz'] = lambda url: sys.stdout.write('Baz handler: %s\n' % url)
+prefixes['/'] =       lambda url: print(f'Root handler: {url}')
+prefixes['/foo'] =    lambda url: print(f'Foo handler: {url}')
+prefixes['/foobar'] = lambda url: print(f'FooBar handler: {url}')
+prefixes['/baz'] =    lambda url: print(f'Baz handler: {url}')
 
 for url in ('/', '/foo', '/foot', '/foobar', 'invalid', '/foobarbaz', '/ba'):
-    key, handler = prefixes.longest_prefix(url)
-    if key is not None:
-        handler(url)  # It is callable, stfu pylint: disable=not-callable
+    handler = prefixes.longest_prefix(url).get()
+    if handler:
+        handler(url)
     else:
         print('Unable to handle', repr(url))
-
-
-if not os.isatty(0):
-    sys.exit(0)
 
 
 try:
@@ -115,6 +111,10 @@ ps.add('/usr/lib')  # Does not change anything
 print('Path prefixes:', ', '.join(iter(ps)))
 for path in ('/etc', '/etc/rc.d', '/usr', '/usr/local', '/usr/local/lib'):
     print('Is', path, 'in the set:', ('yes' if path in ps else 'no'))
+
+
+if not os.isatty(0):
+    sys.exit(0)
 
 
 print('\nDictionary test')

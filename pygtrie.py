@@ -44,6 +44,7 @@ __copyright__ = ('Copyright 2014-2017 Google LLC',
 
 import copy as _copy
 import collections.abc as _abc
+import warnings as _warnings
 
 
 class ShortKeyError(KeyError):
@@ -1079,8 +1080,12 @@ class Trie(_abc.MutableMapping):
         self._pop_value(trace)
 
     class _NoneStep:
-        """Representation of a non-existent step towards non-existent node."""
+        """Representation of a non-existent step towards non-existent node.
 
+        The class is private because it should not be constructed by external
+        code.  Objects of this type are returned by :class:`Trie` methods
+        :func:`Trie.shortest_prefix` and :func:`Trie.longest_prefix`.
+        """
         __slots__ = ()
 
         def __bool__(self):
@@ -1089,38 +1094,72 @@ class Trie(_abc.MutableMapping):
         def get(self, default=None):
             return default
 
-        is_set = has_subtrie = property(__bool__)
-        key = value = property(lambda self: None)
+        is_set = has_subtrie = False
+
+        @property
+        def key(self):
+            """None; in the future will raise :class:`KeyError`."""
+            _warnings.warn(
+                '_NoneStep.key will soon raise KeyError; use `bool(step)` to'
+                ' check whether step is real or _NoneStep.',
+                DeprecationWarning)
+
+        @property
+        def value(self):
+            """None; in the future will raise :class:`KeyError`."""
+            _warnings.warn(
+                '_NoneStep.value will soon raise KeyError; use'
+                ' `step.get(default)` to get value of a step.',
+                DeprecationWarning)
 
         def __getitem__(self, index):
-            """Makes object appear like a (key, value) tuple.
+            """Makes object appear like a ``(key, value)`` tuple.
 
-            This is deprecated and for backwards-compatibility only.  Prefer
-            using ``key`` and ``value`` properties directly.
+            This is deprecated.  Prefer ``bool(self)`` to detect whether this is
+            a :class:`Trie._Step` or ``_NoneStep``; and :func:`Trie._Step.get`
+            to get value of the node.
 
             Args:
-                index: Element index to return.  Zero for key, one for value.
+                index: Element index to return.
 
             Returns:
-                ``self.key`` if index is ``0``, ``self.value`` if it's ``1``.
-                Otherwise raises an IndexError exception.
+                ``None`` if ``index`` is 0 or 1.
 
             Raises:
-                IndexError: if index is not 0 or 1.
-                KeyError: if index is 1 but node has no value assigned.
+                IndexError: if ``index`` is not 0 or 1.
             """
             if index == 0:
-                return self.key
+                _warnings.warn(
+                    'Indexed access to _NoneStep is deprecated; use'
+                    ' `bool(step)` to check whether step is real or _NoneStep.',
+                    DeprecationWarning)
+                return None
             if index == 1:
-                return self.value
+                _warnings.warn(
+                    'Indexed access to _NoneStep is deprecated; use'
+                    ' `step.get(default)` to get value of a step.',
+                    DeprecationWarning)
+                return None
             raise IndexError('index out of range')
 
         def __repr__(self):
             return '(None Step)'
 
-    class _Step(_NoneStep):
-        """Representation of a single step on a path towards particular node."""
+        def __setattr__(self, key, value):
+            raise AttributeError('_NoneStep is read only')
 
+    class _Step:
+        """Representation of a single step on a path towards particular node.
+
+        *Note:* Reading ``value`` property of this class may raise
+        :class:`KeyError` if the node at the step does not have a value.
+        Writing the property always succeeds.  :func:`Trie._Step.get` returns
+        value or default and always succeeds.
+
+        The class is private because it should not be constructed by external
+        code.  Objects of this type are returned by :class:`Trie` methods such
+        as :func:`Trie.prefixes` and :func:`Trie.walk_towards`.
+        """
         __slots__ = ('_trie', '_path', '_pos', '_node', '__key')
 
         def __init__(self, trie, path, pos, node):
@@ -1134,12 +1173,12 @@ class Trie(_abc.MutableMapping):
 
         @property
         def is_set(self):
-            """Returns whether the node has value assigned to it."""
+            """Whether the node has value assigned to it."""
             return self._node.value is not _EMPTY
 
         @property
         def has_subtrie(self):
-            """Returns whether the node has any children."""
+            """Whether the node has any children."""
             return bool(self._node.children)
 
         def get(self, default=None):
@@ -1149,6 +1188,9 @@ class Trie(_abc.MutableMapping):
 
         def set(self, value):
             """Deprecated.  Use ``step.value = value`` instead."""
+            _warnings.warn(
+                '_Step.set() is deprecated; use `step.value = expr` instead.',
+                DeprecationWarning)
             self._node.value = value
 
         def setdefault(self, value):
@@ -1162,7 +1204,7 @@ class Trie(_abc.MutableMapping):
 
         @property
         def key(self):
-            """Returns key of the node."""
+            """Node’s key."""
             if not hasattr(self, '_Step__key'):
                 # pylint:disable=protected-access,attribute-defined-outside-init
                 self.__key = self._trie._key_from_path(self._path[:self._pos])
@@ -1170,7 +1212,7 @@ class Trie(_abc.MutableMapping):
 
         @property
         def value(self):
-            """Returns node's value or raises KeyError."""
+            """Node's value; on read, raises KeyError if node has no value."""
             v = self._node.value
             if v is _EMPTY:
                 raise ShortKeyError(self.key)
@@ -1179,6 +1221,34 @@ class Trie(_abc.MutableMapping):
         @value.setter
         def value(self, value):
             self._node.value = value
+
+        def __getitem__(self, index):
+            """Makes object appear like a (key, value) tuple.
+
+            This is deprecated.  Prefer :attr:`Trie._Step.key` and
+            :attr:`Trie._Step.value` properties or :func:`Trie._Step.get`
+            method.
+
+            Args:
+                index: Element index to return.
+
+            Returns:
+                ``self.key`` if ``index`` is 0 or ``self.value`` if ``index`` is
+                1.
+
+            Raises:
+                IndexError: if ``index`` is not 0 or 1.
+                KeyError: if ``index`` is 1 and the node has no value.
+            """
+            _warnings.warn(
+                'Indexed access to _Step is deprecated; use `step.key` and'
+                ' `step.value` instead.',
+                DeprecationWarning)
+            if index == 0:
+                return self.key
+            if index == 1:
+                return self.value
+            raise IndexError('index out of range')
 
     _NONE_STEP = _NoneStep()
 
