@@ -454,7 +454,7 @@ class TrieTestCase(unittest.TestCase):
             self.assertEqual('42', step.value)
 
             # pylint: disable=protected-access
-            step.value = 42 if is_set else pygtrie._EMPTY
+            step.value = 42 if is_set else pygtrie._NOVAL
 
         def assert_steps(key, raises=False):
             try:

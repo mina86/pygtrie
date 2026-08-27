@@ -45,6 +45,7 @@ __copyright__ = ('Copyright 2014-2017 Google LLC',
 import copy as _copy
 import collections.abc as _abc
 import warnings as _warnings
+import typing as _t
 
 
 class ShortKeyError(KeyError):
@@ -52,14 +53,29 @@ class ShortKeyError(KeyError):
     but does not have a value associated with itself."""
 
 
-class _NoChildren:
+class _NoCopy:
+    """Object which returns itself when copying."""
+    __slots__ = ()
+    def __copy__(self):
+        return self
+    def __deepcopy__(self, memo):
+        return self
+
+
+# Sentinel used as default value in function arguments.
+_Sentinel = _t.NewType('Sentinel', _NoCopy)
+_SENTINEL = _Sentinel(_NoCopy())
+
+# Sentinel indicating node has no value.
+_NoValue = _t.NewType('NoValue', _NoCopy)
+_NOVAL = _NoValue(_NoCopy())
+
+
+class _NoChildren(_NoCopy):
     """Collection representing lack of any children.
 
-    Also acts as an empty iterable and an empty iterator.  This isn’t the
-    cleanest designs but it makes various things more concise and avoids object
-    allocations in a few places.
-
-    Don’t create objects of this type directly; instead use _EMPTY singleton.
+    Don’t create objects of this type directly; instead use ``_NO_CHILDREN``
+    singleton.
     """
     __slots__ = ()
 
@@ -68,11 +84,9 @@ class _NoChildren:
     def __len__(self):
         return 0
 
-    def __iter__(self):
-        return self
-    def __next__(self):
-        raise StopIteration()
-    items = sorted_items = __iter__
+    def items(self):
+        return ()
+    sorted_items = items
 
     def get(self, _step):
         return None
@@ -87,19 +101,25 @@ class _NoChildren:
     def copy(self, _make_copy, _queue):
         return self
 
-    def __deepcopy__(self, memo):
-        return self
-
     # pick and delete aren’t implemented on purpose since it should never be
     # called on a node with no children.
 
+_NO_CHILDREN = _NoChildren()
 
-_EMPTY = _NoChildren()
+
+class _FalsyIterator(_NoCopy):
+    """An empty iterator which is in addition falsy."""
+    __slots__ = ()
+    def __bool__(self):
+        return False
+    def __iter__(self):
+        return self
+    def __next__(self):
+        raise StopIteration
 
 
 class _OneChild:
     """Children collection representing a single child."""
-
     __slots__ = ('step', 'node')
 
     def __init__(self, step, node):
@@ -141,7 +161,7 @@ class _OneChild:
             return children
 
     def delete(self, parent, _step):
-        parent.children = _EMPTY
+        parent.children = _NO_CHILDREN
 
     def copy(self, make_copy, queue):
         cpy = _OneChild(make_copy(self.step), self.node.shallow_copy(make_copy))
@@ -199,8 +219,8 @@ class _Node:
     __slots__ = ('children', 'value')
 
     def __init__(self):
-        self.children = _EMPTY
-        self.value = _EMPTY
+        self.children = _NO_CHILDREN
+        self.value = _NOVAL
 
     def merge(self, other, overwrite):
         """Move children from other node into this one.
@@ -212,13 +232,13 @@ class _Node:
         queue = [(self, other)]
         while queue:
             lhs, rhs = queue.pop()
-            if lhs.value is _EMPTY or (overwrite and rhs.value is not _EMPTY):
+            if lhs.value is _NOVAL or (overwrite and rhs.value is not _NOVAL):
                 lhs.value = rhs.value
-            if lhs.children is _EMPTY:
+            if lhs.children is _NO_CHILDREN:
                 lhs.children = rhs.children
-            elif rhs.children is not _EMPTY:
+            elif rhs.children is not _NO_CHILDREN:
                 lhs.children = lhs.children.merge(rhs.children, queue)
-            rhs.children = _EMPTY
+            rhs.children = _NO_CHILDREN
 
     def iterate(self, path, shallow, items):
         """Yields all the nodes with values associated to them in the trie.
@@ -241,10 +261,10 @@ class _Node:
         node = self
         stack = []
         while True:
-            if node.value is not _EMPTY:
+            if node.value is not _NOVAL:
                 yield path, node.value
 
-            if (not shallow or node.value is _EMPTY) and node.children:
+            if (not shallow or node.value is _NOVAL) and node.children:
                 stack.append(iter(items(node.children)))
                 path.append(None)
 
@@ -278,12 +298,15 @@ class _Node:
             correspondence between original nodes in the trie and constructed
             nodes (see make_test_node_and_compress in test.py).
         """
-        children = self.children and (
-            node.traverse(node_factory, path_conv, path + [step], items)
-            for step, node in items(self.children))
+        if self.children:
+            children = (
+                node.traverse(node_factory, path_conv, path + [step], items)
+                for step, node in items(self.children))
+        else:
+            children = _FalsyIterator()
 
         value_maybe = ()
-        if self.value is not _EMPTY:
+        if self.value is not _NOVAL:
             value_maybe = (self.value,)
 
         return node_factory(path_conv, tuple(path), children, *value_maybe)
@@ -376,12 +399,12 @@ class _Node:
             to reconstruct the node and its full hierarchy.
         """
         # Like iterate, we don't recurse so pickling works on deep tries.
-        state = [] if self.value is _EMPTY else [0]
+        state = [] if self.value is _NOVAL else [0]
         last_cmd = 0
         node = self
         stack = []
         while True:
-            if node.value is not _EMPTY:
+            if node.value is not _NOVAL:
                 last_cmd = 0
                 state.append(node.value)
             stack.append(iter(node.children.items()))
@@ -520,7 +543,7 @@ class _Step:
     @property
     def is_set(self):
         """Whether the node has value assigned to it."""
-        return self._node.value is not _EMPTY
+        return self._node.value is not _NOVAL
 
     @property
     def has_subtrie(self):
@@ -530,7 +553,7 @@ class _Step:
     def get(self, default=None):
         """Returns node's value or the default if value is not assigned."""
         v = self._node.value
-        return default if v is _EMPTY else v
+        return default if v is _NOVAL else v
 
     def set(self, value):
         """Deprecated.  Use ``step.value = value`` instead."""
@@ -541,7 +564,7 @@ class _Step:
 
     def setdefault(self, value):
         """Assigns value to the node if one is not set then returns it."""
-        if self._node.value is _EMPTY:
+        if self._node.value is _NOVAL:
             self._node.value = value
         return self._node.value
 
@@ -560,7 +583,7 @@ class _Step:
     def value(self):
         """Node's value; on read, raises KeyError if node has no value."""
         v = self._node.value
-        if v is _EMPTY:
+        if v is _NOVAL:
             raise ShortKeyError(self.key)
         return v
 
@@ -835,7 +858,7 @@ class Trie(_abc.MutableMapping):
         node = self._root
         for step in self.__path_from_key(key):
             node = node.children.require(node, step)
-        if node.value is _EMPTY or not only_if_missing:
+        if node.value is _NOVAL or not only_if_missing:
             node.value = value
         return node
 
@@ -852,18 +875,18 @@ class Trie(_abc.MutableMapping):
         steps = iter(self.__path_from_key(key))
         node = self._root
         try:
-            while node.value is _EMPTY:
+            while node.value is _NOVAL:
                 node = node.children.require(node, next(steps))
         except StopIteration:
             node.value = True
-            node.children = _EMPTY
+            node.children = _NO_CHILDREN
 
     def __iter__(self):
         return self.iterkeys()
 
     # pylint: disable=arguments-differ
 
-    def iteritems(self, prefix=_EMPTY, shallow=False):
+    def iteritems(self, prefix=_SENTINEL, shallow=False):
         """Yields all nodes with associated values with given prefix.
 
         Only nodes with values are output.  For example::
@@ -894,7 +917,7 @@ class Trie(_abc.MutableMapping):
             [('foo', 'Foo'), ('qux', 'Qux')]
 
         Args:
-            prefix: Prefix to limit iteration to.
+            prefix: If given, prefix to limit iteration to.
             shallow: Perform a shallow traversal, i.e. do not yield items if
                 their prefix has been yielded.
 
@@ -909,14 +932,14 @@ class Trie(_abc.MutableMapping):
                                         shallow, self._items_callback):
             yield (self._key_from_path(path), value)
 
-    def iterkeys(self, prefix=_EMPTY, shallow=False):
+    def iterkeys(self, prefix=_SENTINEL, shallow=False):
         """Yields all keys having associated values with given prefix.
 
         This is equivalent to taking first element of tuples generated by
         :func:`Trie.iteritems` which see for more detailed documentation.
 
         Args:
-            prefix: Prefix to limit iteration to.
+            prefix: If given, prefix to limit iteration to.
             shallow: Perform a shallow traversal, i.e. do not yield keys if
                 their prefix has been yielded.
 
@@ -929,14 +952,14 @@ class Trie(_abc.MutableMapping):
         for key, _ in self.iteritems(prefix=prefix, shallow=shallow):
             yield key
 
-    def itervalues(self, prefix=_EMPTY, shallow=False):
+    def itervalues(self, prefix=_SENTINEL, shallow=False):
         """Yields all values associated with keys with given prefix.
 
         This is equivalent to taking second element of tuples generated by
         :func:`Trie.iteritems` which see for more detailed documentation.
 
         Args:
-            prefix: Prefix to limit iteration to.
+            prefix: If given, prefix to limit iteration to.
             shallow: Perform a shallow traversal, i.e. do not yield values if
                 their prefix has been yielded.
 
@@ -951,7 +974,7 @@ class Trie(_abc.MutableMapping):
                                      shallow, self._items_callback):
             yield value
 
-    def items(self, prefix=_EMPTY, shallow=False):
+    def items(self, prefix=_SENTINEL, shallow=False):
         """Returns a list of ``(key, value)`` pairs in given subtrie.
 
         This is equivalent to constructing a list from generator returned by
@@ -959,7 +982,7 @@ class Trie(_abc.MutableMapping):
         """
         return list(self.iteritems(prefix=prefix, shallow=shallow))
 
-    def keys(self, prefix=_EMPTY, shallow=False):
+    def keys(self, prefix=_SENTINEL, shallow=False):
         """Returns a list of all the keys, with given prefix, in the trie.
 
         This is equivalent to constructing a list from generator returned by
@@ -967,7 +990,7 @@ class Trie(_abc.MutableMapping):
         """
         return list(self.iterkeys(prefix=prefix, shallow=shallow))
 
-    def values(self, prefix=_EMPTY, shallow=False):
+    def values(self, prefix=_SENTINEL, shallow=False):
         """Returns a list of values in given subtrie.
 
         This is equivalent to constructing a list from generator returned by
@@ -983,7 +1006,7 @@ class Trie(_abc.MutableMapping):
         return sum(1 for _ in self.itervalues())
 
     def __bool__(self):
-        return self._root.value is not _EMPTY or bool(self._root.children)
+        return self._root.value is not _NOVAL or bool(self._root.children)
 
     __hash__ = None
 
@@ -1038,7 +1061,7 @@ class Trie(_abc.MutableMapping):
             node, _ = self._get_node(key)
         except KeyError:
             return 0
-        return ((self.HAS_VALUE * (node.value is not _EMPTY)) |
+        return ((self.HAS_VALUE * (node.value is not _NOVAL)) |
                 (self.HAS_SUBTRIE * bool(node.children)))
 
     def has_key(self, key):
@@ -1123,7 +1146,7 @@ class Trie(_abc.MutableMapping):
         if self._slice_maybe(key_or_slice)[1]:
             return self.itervalues(key_or_slice.start)
         node, _ = self._get_node(key_or_slice)
-        if node.value is _EMPTY:
+        if node.value is _NOVAL:
             raise ShortKeyError(key_or_slice)
         return node.value
 
@@ -1156,7 +1179,7 @@ class Trie(_abc.MutableMapping):
         key, is_slice = self._slice_maybe(key_or_slice)
         node = self._set_node(key, value)
         if is_slice:
-            node.children = _EMPTY
+            node.children = _NO_CHILDREN
 
     def setdefault(self, key, default=None):
         """Sets value of a given node if not set already.  Also returns it.
@@ -1177,20 +1200,20 @@ class Trie(_abc.MutableMapping):
 
         Returns:
             Value which was held in the node at the end of specified trace.
-            This may be _EMPTY if the node didn’t have a value in the first
+            This may be ``_NOVAL`` if the node didn’t have a value in the first
             place.
         """
         i = len(trace) - 1  # len(path) >= 1 since root is always there
         step, node = trace[i]
-        value, node.value = node.value, _EMPTY
-        while i and node.value is _EMPTY and not node.children:
+        value, node.value = node.value, _NOVAL
+        while i and node.value is _NOVAL and not node.children:
             i -= 1
             parent_step, parent = trace[i]
             parent.children.delete(parent, step)
             step, node = parent_step, parent
         return value
 
-    def pop(self, key, default=_EMPTY):
+    def pop(self, key, default=_SENTINEL):
         """Deletes value associated with given key and returns it.
 
         Args:
@@ -1214,13 +1237,13 @@ class Trie(_abc.MutableMapping):
         try:
             _, trace = self._get_node(key)
         except KeyError:
-            if default is not _EMPTY:
+            if default is not _SENTINEL:
                 return default
             raise
         value = self._pop_value(trace)
-        if value is not _EMPTY:
+        if value is not _NOVAL:
             return value
-        if default is not _EMPTY:
+        if default is not _SENTINEL:
             return default
         raise ShortKeyError()
 
@@ -1240,7 +1263,7 @@ class Trie(_abc.MutableMapping):
             raise KeyError()
         node = self._root
         trace = [(None, node)]
-        while node.value is _EMPTY:
+        while node.value is _NOVAL:
             step, node = node.children.pick()
             trace.append((step, node))
         key = self._key_from_path((step for step, _ in trace[1:]))
@@ -1283,10 +1306,11 @@ class Trie(_abc.MutableMapping):
         key, is_slice = self._slice_maybe(key_or_slice)
         node, trace = self._get_node(key)
         if is_slice:
-            node.children = _EMPTY
-        elif node.value is _EMPTY:
+            node.children = _NO_CHILDREN
+        elif node.value is _NOVAL:
             raise ShortKeyError(key)
         self._pop_value(trace)
+
 
     _NoneStep = _NoneStep
     _Step = _Step
@@ -1558,16 +1582,16 @@ class Trie(_abc.MutableMapping):
         """Converts a user visible key object to internal path representation.
 
         Args:
-            key: User supplied key or ``_EMPTY``.
+            key: User supplied key or ``_SENTINEL``.
 
         Returns:
-            An empty tuple if ``key`` was ``_EMPTY``, otherwise whatever
+            An empty tuple if ``key`` was ``_SENTINEL``, otherwise whatever
             :func:`Trie._path_from_key` returns.
 
         Raises:
             TypeError: If ``key`` is of invalid type.
         """
-        return () if key is _EMPTY else self._path_from_key(key)
+        return () if key is _SENTINEL else self._path_from_key(key)
 
     def _path_from_key(self, key):
         """Converts a user visible key object to internal path representation.
@@ -1597,7 +1621,7 @@ class Trie(_abc.MutableMapping):
         """
         return tuple(path)
 
-    def traverse(self, node_factory, prefix=_EMPTY):
+    def traverse(self, node_factory, prefix=_SENTINEL):
         """Traverses the tree using node_factory object.
 
         node_factory is a callable which accepts (path_conv, path, children,
@@ -1931,7 +1955,7 @@ class PrefixSet(_abc.MutableSet):
         """
         return self._trie.iterkeys()
 
-    def iter(self, prefix=_EMPTY):
+    def iter(self, prefix=_SENTINEL):
         """Iterates over all keys in the set optionally starting with a prefix.
 
         Since a key does not have to be explicitly added to the set to be an
@@ -1952,7 +1976,7 @@ class PrefixSet(_abc.MutableSet):
         with no arguments will yield "foo" only.  However, when called with
         "foobar" argument, it will yield "foobar" only.
         """
-        if prefix is _EMPTY:
+        if prefix is _SENTINEL:
             return iter(self)
         if self._trie.has_node(prefix):
             return self._trie.iterkeys(prefix=prefix)
