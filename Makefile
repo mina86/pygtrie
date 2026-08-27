@@ -9,7 +9,8 @@ lint: .pylintrc pygtrie.py test.py example.py
 	"$$lint" --rcfile $^
 
 coverage: test.py pygtrie.py
-	python3-coverage run $< && python3-coverage report -m
+	python3-coverage run --source=pygtrie $< && \
+		python3-coverage report -m
 
 build:
 	python3 -m build -swn

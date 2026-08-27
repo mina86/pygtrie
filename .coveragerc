@@ -7,6 +7,5 @@ branch = on
 [report]
 exclude_lines =
     raise NotImplementedError
-    .* # Python 2 compatibility
 show_missing = true
 fail_under = 95
