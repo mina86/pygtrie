@@ -266,11 +266,6 @@ class TrieTestCase(unittest.TestCase):
         """Test various methods check for invalid arguments"""
         d = dict.fromkeys((self._SHORT_KEY, self._LONG_KEY), 42)
         t = trie_factory(self._TRIE_CTOR, d)
-
-        self.assertRaisesRegex(
-            ValueError, 'update.. takes at most one positional argument,',
-            t.update, (self._LONG_KEY, 42), (self._VERY_LONG_KEY, 42))
-
         self.assertRaisesRegex(TypeError, r'slice\(.*, None\)',
                                lambda: t[self._SHORT_KEY:self._LONG_KEY])
         self.assertRaisesRegex(TypeError, r"slice\(.*, 'foo'\)",

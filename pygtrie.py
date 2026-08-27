@@ -438,7 +438,7 @@ class Trie(_abc.MutableMapping):
     preferred when using string keys.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, other=(), /, **kwargs):
         """Initialises the trie.
 
         Arguments are interpreted the same way :func:`Trie.update` interprets
@@ -446,7 +446,7 @@ class Trie(_abc.MutableMapping):
         """
         self._root = _Node()
         self._items_callback = self._ITEMS_CALLBACKS[0]
-        self.update(*args, **kwargs)
+        self.update(other, **kwargs)
 
     _ITEMS_CALLBACKS = (lambda x: x.items(), lambda x: x.sorted_items())
 
@@ -489,22 +489,15 @@ class Trie(_abc.MutableMapping):
         """Removes all the values from the trie."""
         self._root = _Node()
 
-    def update(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def update(self, other=(), /, **kwargs):
         """Updates stored values.  Works like :meth:`dict.update`."""
-        if len(args) > 1:
-            raise ValueError('update() takes at most one positional argument, '
-                             '%d given.' % len(args))
-        # We have this here instead of just letting MutableMapping.update()
-        # handle things because it will iterate over keys and for each key
-        # retrieve the value.  With Trie, this may be expensive since the path
-        # to the node would have to be walked twice.  Instead, we have our own
-        # implementation where iteritems() is used avoiding the unnecessary
-        # value look-up.
-        if args and isinstance(args[0], Trie):
-            for key, value in args[0].items():
-                self[key] = value
-            args = ()
-        super().update(*args, **kwargs)
+        if isinstance(other, Trie):
+            # MutableMapping.update() does `for key in other: self[key] =
+            # other[key]` which performs key lookup twice.  If we’re dealing
+            # with a Trie, that’s quite expensive so convert `other` to an
+            # iterator over items of the trie.
+            other = other.items()
+        super().update(other, **kwargs)
 
     def merge(self, other, overwrite=False):
         """Moves nodes from other trie into this one.
@@ -1711,31 +1704,30 @@ class StringTrie(Trie):
         handler = handlers.longest_prefix(request_path)
     """
 
-    def __init__(self, *args, **kwargs):  # pylint: disable=differing-param-doc
+    def __init__(self, other=(), /, separator='/', **kwargs):
         """Initialises the trie.
 
         Except for a ``separator`` named argument, all other arguments are
         interpreted the same way :func:`Trie.update` interprets them.
 
         Args:
-            *args: Passed to super class initialiser.
-            **kwargs: Passed to super class initialiser.
+            other: Passed to super class initialiser.
             separator: A separator to use when splitting keys into paths used by
                 the trie.  "/" is used if this argument is not specified.  This
                 named argument is not specified on the function's prototype
                 because of Python's limitations.
+            **kwargs: Passed to super class initialiser.
 
         Raises:
             TypeError: If ``separator`` is not a string.
             ValueError: If ``separator`` is empty.
         """
-        separator = kwargs.pop('separator', '/')
         if not isinstance(separator, str):
             raise TypeError('separator must be a string')
         if not separator:
-            raise ValueError('separator can not be empty')
+            raise ValueError('separator cannot be empty')
         self._separator = separator
-        super().__init__(*args, **kwargs)
+        super().__init__(other, **kwargs)
 
     @classmethod
     def fromkeys(cls, keys, value=None, separator='/'):  # pylint: disable=arguments-differ
