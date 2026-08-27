@@ -36,9 +36,9 @@ Features
 For a few simple examples see ``example.py`` file.
 """
 
-__author__ = 'Michal Nazarewicz <mina86@mina86.com>'
+__author__ = 'Michał Nazarewicz <mina86@mina86.com>'
 __copyright__ = ('Copyright 2014-2017 Google LLC',
-                 'Copyright 2018-2020 Michal Nazarewicz <mina86@mina86.com>')
+                 'Copyright 2018-2026 Michał Nazarewicz <mina86@mina86.com>')
 # __version__ = '' # set by setup.py sdist or build
 
 

@@ -37,9 +37,9 @@ With that setup, a new release can be labelled by simply invoking:
 """
 
 __author__ = ('Douglas Creager <dcreager@dcreager.net>',
-              'Michal Nazarewicz <mina86@mina86.com>')
+              'Michał Nazarewicz <mina86@mina86.com>')
 __license__ = 'This file is placed into the public domain.'
-__maintainer__ = 'Michal Nazarewicz'
+__maintainer__ = 'Michał Nazarewicz'
 __email__ = 'mina86@mina86.com'
 
 __all__ = ('get_version',)

@@ -151,7 +151,7 @@ kwargs = {
     'version': release,
     'description': 'A pure Python trie data structure implementation.',
     'long_description': readme,
-    'author': 'Michal Nazarewicz',
+    'author': 'Michał Nazarewicz',
     'author_email': 'mina86@mina86.com',
     'url': 'https://github.com/mina86/pygtrie',
     'py_modules': ['pygtrie'],

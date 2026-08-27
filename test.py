@@ -2,9 +2,9 @@
 
 """trie module unit tests."""
 
-__author__ = 'Michal Nazarewicz <mina86@mina86.com>'
+__author__ = 'Michał Nazarewicz <mina86@mina86.com>'
 __copyright__ = ('Copyright 2014-2017 Google LLC',
-                 'Copyright 2018-2019 Michal Nazarewicz <mina86@mina86.com>')
+                 'Copyright 2018-2019 Michał Nazarewicz <mina86@mina86.com>')
 
 import array
 import base64
