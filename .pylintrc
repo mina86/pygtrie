@@ -7,13 +7,6 @@
 # pygtk.require().
 #init-hook=
 
-# Profiled execution.
-profile=no
-
-# Add files or directories to the blacklist. They should be base names, not
-# paths.
-ignore=CVS
-
 # Pickle collected data for later comparisons.
 persistent=yes
 
@@ -21,9 +14,7 @@ persistent=yes
 # usually to register additional checkers.
 load-plugins=pylint.extensions.check_elif,
              pylint.extensions.docparams,
-             pylint.extensions.emptystring,
              pylint.extensions.redefined_variable_type
-
 
 [MESSAGES CONTROL]
 
@@ -43,16 +34,11 @@ load-plugins=pylint.extensions.check_elif,
 # --disable=W"
 disable=consider-using-f-string,
         locally-disabled,
-        missing-return-type-doc,
         missing-type-doc,
         missing-yield-type-doc,
         no-else-return,
-        no-self-use,
-        super-with-arguments,
-        too-few-public-methods,
         too-many-lines,
-        too-many-public-methods,
-        unidiomatic-typecheck
+        too-many-public-methods
 
 
 [REPORTS]
@@ -61,11 +47,6 @@ disable=consider-using-f-string,
 # (visual studio) and html. You can also give a reporter class, eg
 # mypackage.mymodule.MyReporterClass.
 output-format=text
-
-# Put messages in a separate file for each module / package specified on the
-# command line instead of printing them on stdout. Reports (if any) will be
-# written in a file name "pylint_global.[txt|html]".
-files-output=no
 
 # Tells whether to display a full report or only the messages
 reports=no
@@ -95,9 +76,6 @@ ignore-long-lines=^\s*(# )?<?https?://\S+>?$
 # else.
 single-line-if-stmt=no
 
-# List of optional constructs for which whitespace checking is disabled
-no-space-check=
-
 # String used as indentation unit. This is usually " " (4 spaces) or "\t" (1
 # tab).
 indent-string='    '
@@ -112,10 +90,6 @@ ignore-mixin-members=yes
 # List of classes names for which member attributes should not be checked
 # (useful for classes with attributes dynamically set).
 ignored-classes=SQLObject
-
-# When zope mode is activated, add a predefined set of Zope acquired attributes
-# to generated-members.
-zope=no
 
 # List of members which are set dynamically and missed by pylint inference
 # system, and so shouldn't trigger E0201 when accessed. Python regular
@@ -153,9 +127,6 @@ ignore-imports=no
 
 
 [BASIC]
-
-# List of builtins function names that should not be used, separated by a comma
-bad-functions=map,filter,apply,input
 
 # Regular expression which should only match correct module names
 module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
@@ -207,7 +178,7 @@ docstring-min-length=4
 [CLASSES]
 
 # List of method names used to declare (i.e. assign) instance attributes.
-defining-attr-methods=__init__,__new__,setUp
+defining-attr-methods=__init__
 
 # List of valid names for the first argument in a class method.
 valid-classmethod-first-arg=cls
@@ -272,4 +243,4 @@ max-public-methods=20
 
 # Exceptions that will emit a warning when being caught. Defaults to
 # "Exception"
-overgeneral-exceptions=Exception
+overgeneral-exceptions=builtins.Exception

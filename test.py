@@ -15,7 +15,7 @@ import unittest
 
 import pygtrie
 
-# pylint: disable=missing-docstring
+# pylint: disable=missing-docstring,too-few-public-methods
 
 
 class _TrieFactoryParameteriser:

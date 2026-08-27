@@ -130,6 +130,7 @@ class _OneChild:
 
     def merge(self, other, queue):
         """Moves children from other into this object."""
+        # pylint: disable=unidiomatic-typecheck
         if type(other) == _OneChild and other.step == self.step:
             queue.append((self.node, other.node))
             return self
@@ -1805,14 +1806,14 @@ class PrefixSet(_abc.MutableSet):
 
     def copy(self):
         """Returns a shallow copy of the object."""
-        return self.__copy__()
-
-    def __copy__(self):
         # pylint: disable=protected-access
         cpy = self.__class__()
         cpy.__dict__ = self.__dict__.copy()
-        cpy._trie = self._trie.__copy__()
+        cpy._trie = self._trie.copy()
         return cpy
+
+    def __copy__(self):
+        return self.copy()
 
     def __deepcopy__(self, memo):
         # pylint: disable=protected-access
