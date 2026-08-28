@@ -1,4 +1,4 @@
-all: test lint coverage docs build
+all: test lint mypy coverage docs build
 
 test: test.py pygtrie.py
 	python3 -X dev $<
@@ -7,6 +7,9 @@ test: test.py pygtrie.py
 lint: .pylintrc pygtrie.py test.py example.py
 	lint=$$(which pylint3 2>/dev/null) || lint=$$(which pylint) && \
 	"$$lint" --rcfile $^
+
+mypy: pygtrie.py example.py
+	mypy --strict $^
 
 coverage: test.py pygtrie.py
 	python3-coverage run --source=pygtrie $< && \

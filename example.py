@@ -24,7 +24,7 @@ SUB_DIR = os.path.join(ROOT_DIR, 'lib')
 SUB_DIRS = tuple(os.path.join(ROOT_DIR, d)
                  for d in ('lib', 'lib32', 'lib64', 'share'))
 
-paths = pygtrie.StringTrie(separator=os.path.sep)
+paths: pygtrie.StringTrie[int] = pygtrie.StringTrie(separator=os.path.sep)
 
 # Read sizes regular files into a Trie
 for dirpath, unused_dirnames, filenames in os.walk(ROOT_DIR):
@@ -64,7 +64,7 @@ for directory in SUB_DIRS:
 print('\nStoring URL handlers map')
 print('========================\n')
 
-prefixes = pygtrie.CharTrie()
+prefixes: pygtrie.CharTrie[typing.Callable[[str], None]] = pygtrie.CharTrie()
 prefixes['/'] =       lambda url: print(f'Root handler: {url}')
 prefixes['/foo'] =    lambda url: print(f'Foo handler: {url}')
 prefixes['/foobar'] = lambda url: print(f'FooBar handler: {url}')
@@ -81,7 +81,7 @@ for url in ('/', '/foo', '/foot', '/foobar', 'invalid', '/foobarbaz', '/ba'):
 print('\nCustom key-path conversion')
 print('==========\n')
 
-class PostalTrie(pygtrie.Trie):
+class PostalTrie(pygtrie.Trie[str, bool, int]):
     """An example Trie which uses ‘xx-yyy’ postal codes as keys.
 
     The ‘xx-yyy’ key is split into integers: ``(xx, y, y, y)``.  The class
@@ -119,7 +119,7 @@ try:
     import termios
     import tty
 
-    def getch():
+    def getch() -> str:
         """Reads single character from standard input."""
         attr = termios.tcgetattr(0)
         try:
@@ -130,7 +130,7 @@ try:
 
 except ImportError:
     try:
-        from msvcrt import getch  # pylint: disable=import-error
+        from msvcrt import getch  # type: ignore[attr-defined,no-redef]  # pylint: disable=import-error
     except ImportError:
         sys.exit(0)
 
@@ -158,7 +158,7 @@ if not os.isatty(0):
 print('\nDictionary test')
 print('===============\n')
 
-words = pygtrie.CharTrie()
+words: pygtrie.CharTrie[bool] = pygtrie.CharTrie()
 words['cat'] = True
 words['caterpillar'] = True
 words['car'] = True

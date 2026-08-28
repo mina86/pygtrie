@@ -7,5 +7,6 @@ branch = on
 [report]
 exclude_lines =
     raise NotImplementedError
+    -> .*: *\.\.\.$
 show_missing = true
 fail_under = 95
