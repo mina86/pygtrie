@@ -602,15 +602,41 @@ _NONE_STEP = _NoneStep()
 class Trie(_abc.MutableMapping):
     """A trie implementation with dict interface plus some extensions.
 
-    Keys used with the :class:`pygtrie.Trie` class must be iterable which each
-    component being a hashable objects.  In other words, for a given key,
-    ``dict.fromkeys(key)`` must be valid expression.
+    Keys used with the class must be an iterables of hashable objects.  In other
+    words, for a given key, ``dict.fromkeys(key)`` must be valid expression.  In
+    particular, strings work well as keys, however getting them back (for
+    example via :func:`Trie.iterkeys` method), instead of strings, tuples of
+    characters are produced.
 
-    In particular, strings work well as trie keys, however when getting them
-    back (for example via :func:`Trie.iterkeys` method), instead of strings,
-    tuples of characters are produced.  For that reason,
-    :class:`pygtrie.CharTrie` or :class:`pygtrie.StringTrie` classes may be
-    preferred when using string keys.
+    Subclasses can modify the way keys are iterated over by overriding
+    :func:`Trie._path_from_key` and :func:`Trie._key_from_path`.  For example,
+    consider a trie whose keys are Polish postal codes which have format
+    ‘xx-yyy’ where ‘xx’ is to be treated as a single number but ‘yyy’ divided by
+    digit::
+
+        class PostalTrie(Trie):
+
+            def _path_from_key(self, key: str) -> typing.Sequence[int]:
+                if '-' not in key:
+                    return [int(key)] if key else ()
+                head, tail = key.split('-')
+                return [int(head)] + [int(digit) for digit in tail]
+
+            def _key_from_path(self, path: typing.Iterable[int]) -> str:
+                path = iter(path)
+                try:
+                    head = next(path)
+                except StopIteration:
+                    return ''  # empty path
+                tail = ''.join(str(digit) for digit in path)
+                if tail:
+                    return f'{head:02}-{tail}'
+                else:
+                    return f'{head:02}'
+
+    :class:`pygtrie.CharTrie` and :class:`pygtrie.StringTrie` classes handle
+    cases of iterating over characters of a string and splitting string by
+    a separator respectively.
     """
 
     def __init__(self, other=(), /, **kwargs):
@@ -723,19 +749,28 @@ class Trie(_abc.MutableMapping):
         # pylint: disable=protected-access
         dst._root.merge(src._root, overwrite=overwrite)
 
-    def copy(self, __make_copy=lambda x: x):
-        """Returns a shallow copy of the object."""
+    def __copy(self, make_copy=lambda x: x):
+        """Returns a shallow copy of the object.
+
+        Args:
+            make_copy: Function copying values.  If not given, values won’t be
+                copied.
+        """
         # pylint: disable=protected-access
         cpy = self.__class__()
         cpy.__dict__ = self.__dict__.copy()
-        cpy._root = self._root.copy(__make_copy)
+        cpy._root = self._root.copy(make_copy)
         return cpy
 
+    def copy(self):
+        """Returns a shallow copy of the object."""
+        return self.__copy()
+
     def __copy__(self):
-        return self.copy()
+        return self.__copy()
 
     def __deepcopy__(self, memo):
-        return self.copy(lambda x: _copy.deepcopy(x, memo))
+        return self.__copy(lambda x: _copy.deepcopy(x, memo))
 
     @classmethod
     def fromkeys(cls, keys, value=None):
@@ -941,9 +976,9 @@ class Trie(_abc.MutableMapping):
         return list(self.itervalues(prefix=prefix, shallow=shallow))
 
     def __len__(self):
-        """Returns number of values in a trie.
+        """Returns the number of values in the trie.
 
-        Note that this method is expensive as it iterates over the whole trie.
+        This method is expensive to run as it iterates over the whole trie.
         """
         return sum(1 for _ in self.itervalues())
 
@@ -1043,7 +1078,7 @@ class Trie(_abc.MutableMapping):
         return key_or_slice, False
 
     def __getitem__(self, key_or_slice):
-        """Returns value associated with given key or raises KeyError.
+        """Returns value associated with given key or raises :class:`KeyError`.
 
         When argument is a single key, value for that key is returned (or
         :class:`KeyError` exception is thrown if the node does not exist or has
@@ -1162,7 +1197,7 @@ class Trie(_abc.MutableMapping):
             key: A key to look for.
             default: If specified, value that will be returned if given key has
                 no value associated with it.  If not specified, method will
-                throw KeyError in such cases.
+                throw :class:`KeyError` in such cases.
 
         Returns:
             Removed value, if key had value associated with it, or ``default``
@@ -1410,19 +1445,14 @@ class Trie(_abc.MutableMapping):
         """Checks whether tries are equal with the same structure.
 
         This is stricter comparison than the one performed by equality operator.
-        It not only requires for keys and values to be equal but also for the
-        two tries to be of the same type and have the same structure.
+        It not only requires keys and values to be equal but also the two tries
+        to be of the same type and have the same structure.
 
-        For example, for two :class:`pygtrie.StringTrie` objects to be equal,
-        they need to have the same structure as well as the same separator as
-        seen below:
+        For example, two :class:`pygtrie.StringTrie` objects compare equal, they
+        need to have the same structure as well as the same separator as seen
+        below:
 
             >>> import pygtrie
-            >>> t0 = StringTrie({'foo/bar': 42}, separator='/')
-            >>> t1 = StringTrie({'foo.bar': 42}, separator='.')
-            >>> t0.strictly_equals(t1)
-            False
-
             >>> t0 = StringTrie({'foo/bar.baz': 42}, separator='/')
             >>> t1 = StringTrie({'foo/bar.baz': 42}, separator='.')
             >>> t0 == t1
@@ -1892,7 +1922,7 @@ class PrefixSet(_abc.MutableSet):
 
     def __contains__(self, key):
         """Checks whether set contains key or its prefix."""
-        return bool(self._trie.shortest_prefix(key)[1])
+        return self._trie.shortest_prefix(key).get(False)
 
     def __iter__(self):
         """Return iterator over all prefixes in the set.

@@ -22,6 +22,7 @@ Trie classes
 
 .. autoclass:: pygtrie.Trie
    :members:
+   :private-members: _Step, _NoneStep, _path_from_key, _key_from_path
 
 .. autoclass:: pygtrie.CharTrie
    :members:

@@ -14,7 +14,7 @@
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = '1.3'
+needs_sphinx = '9.0'
 
 import os
 import sys
@@ -30,7 +30,7 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx',
 templates_path = []
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+#source_suffix = {'.rst': 'restructuredtext'}
 
 # The encoding of source files.
 source_encoding = 'utf-8-sig'
@@ -56,6 +56,7 @@ copyright = u'2014-2017 by Google LLC; 2018-2026 by Michał Nazarewicz'
 # directories to ignore when looking for source files.
 with open('.gitignore') as fd:
     exclude_patterns = fd.read().splitlines()
+exclude_patterns.append('README.rst')
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -159,9 +160,14 @@ htmlhelp_basename = 'pygtriedoc'
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'http://docs.python.org/': None}
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 
 napoleon_google_docstring = True
 napoleon_include_init_with_doc = True
 napoleon_include_special_with_doc = True
+
+
+autodoc_default_options = {
+    'member-order': 'bysource',
+}

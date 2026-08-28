@@ -10,10 +10,11 @@ __copyright__ = 'Copyright 2014 Google LLC'
 import os
 import stat
 import sys
+import typing
 
 import pygtrie
 
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,redefined-outer-name
 
 print('Storing file information in the trie')
 print('====================================\n')
@@ -75,6 +76,43 @@ for url in ('/', '/foo', '/foot', '/foobar', 'invalid', '/foobarbaz', '/ba'):
         handler(url)
     else:
         print('Unable to handle', repr(url))
+
+
+print('\nCustom key-path conversion')
+print('==========\n')
+
+class PostalTrie(pygtrie.Trie):
+    """An example Trie which uses ‘xx-yyy’ postal codes as keys.
+
+    The ‘xx-yyy’ key is split into integers: ``(xx, y, y, y)``.  The class
+    demonstrates usage of ``_path_from_key`` and ``_key_from_path`` methods.
+    """
+
+    def _path_from_key(self, key: str) -> typing.Sequence[int]:
+        if '-' not in key:
+            return [int(key)] if key else ()
+        head, tail = key.split('-')
+        return [int(head)] + [int(digit) for digit in tail]
+
+    def _key_from_path(self, path: typing.Iterable[int]) -> str:
+        path = iter(path)
+        try:
+            head = next(path)
+        except StopIteration:
+            return ''  # empty path
+        tail = ''.join(str(digit) for digit in path)
+        if tail:
+            return f'{head:02}-{tail}'
+        else:
+            return f'{head:02}'
+
+trie = PostalTrie()
+trie['00-325'] = True
+trie['28-133'] = True
+trie['30-001'] = True
+
+for code in trie.keys():
+    print(code)
 
 
 try:
