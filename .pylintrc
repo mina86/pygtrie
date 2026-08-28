@@ -38,8 +38,8 @@ disable=consider-using-f-string,
         missing-yield-type-doc,
         no-else-return,
         too-many-lines,
-        too-many-public-methods
-
+        too-many-public-methods,
+        too-few-public-methods
 
 [REPORTS]
 

@@ -27,9 +27,9 @@ interface.  As such, in most circumstances, ``Trie`` could be used as
 a drop-in replacement for a ``dict``, but the prefix nature of the
 data structure is trie’s real strength.
 
-The module also contains ``PrefixSet`` class which uses a trie to
-store a set of prefixes such that a key is contained in the set if it
-or its prefix is stored in the set.
+The module also contains :`PrefixSet` class which uses a trie to store
+a set of prefixes such that a key is contained in the set if it, or any
+of its prefixes, is stored in the set.
 
 Features
 --------

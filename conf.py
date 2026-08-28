@@ -16,8 +16,15 @@
 # If your documentation needs a minimal Sphinx version, state it here.
 needs_sphinx = '9.0'
 
+import ast
+import inspect
 import os
+import re
 import sys
+
+# import sphinx.pycode.parser
+import sphinx.util.inspect
+import sphinx.pycode.ast
 
 sys.path.insert(0, os.getcwd())
 
@@ -171,3 +178,72 @@ napoleon_include_special_with_doc = True
 autodoc_default_options = {
     'member-order': 'bysource',
 }
+autodoc_preserve_defaults = True
+
+
+nitpicky = True
+nitpick_ignore_regex = {
+    (r'py:class', r'^pygtrie\.(?:[KVST]|_Sentinel)$'),
+}
+
+
+def process_signature(
+    app,
+    obj_type,
+    name,
+    obj,
+    options,
+    signature,
+    return_annotation,
+):
+    if obj_type == 'class' and name == 'pygtrie._Step':
+        # Hide _Step’s constructor signature.
+        signature = ''
+
+    return signature, return_annotation
+
+
+# Work-around for <https://github.com/sphinx-doc/sphinx/issues/10351>.
+#
+# Because of the issue, autodoc-process-signature does not process overloads.
+# To work around this issue, we’re monkey-patching a lower level function which
+# handles function signatures.
+def sphinx_inspect_define_patch(
+    kind: inspect._ParameterKind,
+    arg: ast.arg,
+    code: str,
+    *,
+    defexpr: ast.expr | None,
+) -> inspect.Parameter:
+    """Defines a new Parameter and does some cleanups.
+
+    First, it hides sentinels used as default values.  If a default value of
+    a parameter is '_SENTINEL', replaces it with '...'.  Further, if the type of
+    the parameter has '| _Sentinel', strips it.
+
+    Second, replaces K_contra and V_contra by K and V respectively to simplify
+    the documentation.
+    """
+    if defexpr is None:
+        default = inspect.Parameter.empty
+    else:
+        value = sphinx.pycode.ast.unparse(defexpr, code)
+        if value == '_SENTINEL':
+            value = '...'
+        default = sphinx.util.inspect.DefaultValue(value)
+
+    value = sphinx.pycode.ast.unparse(arg.annotation, code)
+    if value:
+        value = value.replace(' | ~pygtrie._Sentinel', '')
+        value = re.sub(r'\b([KV])_contra\b', r'\1', value).strip()
+    annotation = value or inspect.Parameter.empty
+
+    return inspect.Parameter(
+        arg.arg, kind, default=default, annotation=annotation)
+
+
+sphinx.util.inspect._define = sphinx_inspect_define_patch
+
+
+def setup(app):
+    app.connect('autodoc-process-signature', process_signature)

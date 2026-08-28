@@ -22,7 +22,7 @@ Trie classes
 
 .. autoclass:: pygtrie.Trie
    :members:
-   :private-members: _Step, _NoneStep, _path_from_key, _key_from_path
+   :private-members: _path_from_key, _key_from_path
 
 .. autoclass:: pygtrie.CharTrie
    :members:
@@ -30,6 +30,11 @@ Trie classes
 .. autoclass:: pygtrie.StringTrie
    :members:
 
+.. autoclass:: pygtrie._Step
+   :members:
+
+.. autoclass:: pygtrie._NoneStep
+   :members:
 
 PrefixSet class
 ---------------
@@ -42,5 +47,12 @@ Custom exceptions
 
 .. autoclass:: pygtrie.ShortKeyError
    :members:
+
+Typing classes
+---------------
+
+.. autoclass:: pygtrie.NodeFactory
+   :members:
+
 
 .. include:: version-history.rst

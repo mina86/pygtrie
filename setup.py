@@ -29,8 +29,10 @@ class BuildDocCommand(setuptools.Command):
         version = '.'.join(release.split('.', 2)[0:2])
         outdir = tempfile.mkdtemp() if self.dry_run else 'html'
         try:
-            subprocess.check_call(('sphinx-build', '-Drelease=' + release,
-                                   '-n', '-Dversion=' + version, '.', outdir))
+            cmd = ('sphinx-build', '-Drelease=' + release,
+                   '-n', '-Dversion=' + version, '.', outdir)
+            print(' '.join(cmd), file=sys.stderr)
+            subprocess.check_call(cmd)
         finally:
             if self.dry_run:
                 shutil.rmtree(outdir)

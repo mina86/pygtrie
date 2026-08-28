@@ -14,7 +14,7 @@ import typing
 
 import pygtrie
 
-# pylint: disable=invalid-name,redefined-outer-name
+# pylint: disable=invalid-name,redefined-outer-name,missing-function-docstring
 
 print('Storing file information in the trie')
 print('====================================\n')
@@ -81,38 +81,54 @@ for url in ('/', '/foo', '/foot', '/foobar', 'invalid', '/foobarbaz', '/ba'):
 print('\nCustom key-path conversion')
 print('==========\n')
 
-class PostalTrie(pygtrie.Trie[str, bool, int]):
-    """An example Trie which uses ‘xx-yyy’ postal codes as keys.
+class FactorsTrie(pygtrie.Trie[int, bool, int]):
+    """An example Trie which splits positive integers into factors."""
 
-    The ‘xx-yyy’ key is split into integers: ``(xx, y, y, y)``.  The class
-    demonstrates usage of ``_path_from_key`` and ``_key_from_path`` methods.
-    """
+    def _path_from_key(self, key: int) -> typing.Sequence[int]:
+        if key < 1:
+            raise ValueError('key must be a positive integer')
+        factors = []
+        while key % 2 == 0:
+            factors.append(2)
+            key //= 2
+        factor = 3
+        while key > 1:
+            while key % factor == 0:
+                factors.append(factor)
+                key //= factor
+            factor += 2
+        return factors
 
-    def _path_from_key(self, key: str) -> typing.Sequence[int]:
-        if '-' not in key:
-            return [int(key)] if key else ()
-        head, tail = key.split('-')
-        return [int(head)] + [int(digit) for digit in tail]
+    def _key_from_path(self, path: typing.Iterable[int]) -> int:
+        n = 1
+        for factor in path:
+            n *= factor
+        return n
 
-    def _key_from_path(self, path: typing.Iterable[int]) -> str:
-        path = iter(path)
-        try:
-            head = next(path)
-        except StopIteration:
-            return ''  # empty path
-        tail = ''.join(str(digit) for digit in path)
-        if tail:
-            return f'{head:02}-{tail}'
-        else:
-            return f'{head:02}'
+trie = FactorsTrie()
+for n in range(1, 100):
+    trie[n] = True
 
-trie = PostalTrie()
-trie['00-325'] = True
-trie['28-133'] = True
-trie['30-001'] = True
+def traverse_callback(
+        key_from_path: typing.Callable[[typing.Iterable[int]], int],
+        path: typing.Sequence[int],
+        children: typing.Iterable[list[str]],
+        _value: bool = False) -> list[str]:
+    output = []
+    if not path:
+        indent = ''
+        output.append('1 = 1')
+    else:
+        num = str(path[-1])
+        indent = ' ' * len(num)
+        output.append(f'* {num} = {key_from_path(path)}')
+    output.extend(f'{indent}   {line}'
+                  for lines in children
+                  for line in lines)
+    return output
 
-for code in trie.keys():
-    print(code)
+for line in trie.traverse(traverse_callback):
+    print(line)
 
 
 try:
