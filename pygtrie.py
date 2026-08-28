@@ -425,6 +425,180 @@ class _Node:
                 stack[-1].value = next(state)
 
 
+class _NoneStep:
+    """Representation of a non-existent step towards non-existent node.
+
+    The class is private because it should not be constructed by external
+    code.  Objects of this type are returned by :class:`Trie` methods
+    :func:`Trie.shortest_prefix` and :func:`Trie.longest_prefix`.
+    """
+    __slots__ = ()
+
+    def __bool__(self):
+        return False
+
+    def get(self, default=None):
+        return default
+
+    is_set = has_subtrie = False
+
+    @property
+    def key(self):
+        """None; in the future will raise :class:`KeyError`."""
+        _warnings.warn(
+            '_NoneStep.key will soon raise KeyError; use `bool(step)` to'
+            ' check whether step is real or _NoneStep.',
+            DeprecationWarning)
+
+    @property
+    def value(self):
+        """None; in the future will raise :class:`KeyError`."""
+        _warnings.warn(
+            '_NoneStep.value will soon raise KeyError; use'
+            ' `step.get(default)` to get value of a step.',
+            DeprecationWarning)
+
+    def __getitem__(self, index):
+        """Makes object appear like a ``(key, value)`` tuple.
+
+        This is deprecated.  Prefer ``bool(self)`` to detect whether this is
+        a :class:`Trie._Step` or ``_NoneStep``; and :func:`Trie._Step.get`
+        to get value of the node.
+
+        Args:
+            index: Element index to return.
+
+        Returns:
+            ``None`` if ``index`` is 0 or 1.
+
+        Raises:
+            IndexError: if ``index`` is not 0 or 1.
+        """
+        if index == 0:
+            _warnings.warn(
+                'Indexed access to _NoneStep is deprecated; use'
+                ' `bool(step)` to check whether step is real or _NoneStep.',
+                DeprecationWarning)
+            return None
+        if index == 1:
+            _warnings.warn(
+                'Indexed access to _NoneStep is deprecated; use'
+                ' `step.get(default)` to get value of a step.',
+                DeprecationWarning)
+            return None
+        raise IndexError('index out of range')
+
+    def __repr__(self):
+        return '(None Step)'
+
+    def __setattr__(self, key, value):
+        raise AttributeError('_NoneStep is read only')
+
+class _Step:
+    """Representation of a single step on a path towards particular node.
+
+    *Note:* Reading ``value`` property of this class may raise
+    :class:`KeyError` if the node at the step does not have a value.
+    Writing the property always succeeds.  :func:`Trie._Step.get` returns
+    value or default and always succeeds.
+
+    The class is private because it should not be constructed by external
+    code.  Objects of this type are returned by :class:`Trie` methods such
+    as :func:`Trie.prefixes` and :func:`Trie.walk_towards`.
+    """
+    __slots__ = ('_trie', '_path', '_pos', '_node', '__key')
+
+    def __init__(self, trie, path, pos, node):
+        self._trie = trie
+        self._path = path
+        self._pos = pos
+        self._node = node
+
+    def __bool__(self):
+        return True
+
+    @property
+    def is_set(self):
+        """Whether the node has value assigned to it."""
+        return self._node.value is not _EMPTY
+
+    @property
+    def has_subtrie(self):
+        """Whether the node has any children."""
+        return bool(self._node.children)
+
+    def get(self, default=None):
+        """Returns node's value or the default if value is not assigned."""
+        v = self._node.value
+        return default if v is _EMPTY else v
+
+    def set(self, value):
+        """Deprecated.  Use ``step.value = value`` instead."""
+        _warnings.warn(
+            '_Step.set() is deprecated; use `step.value = expr` instead.',
+            DeprecationWarning)
+        self._node.value = value
+
+    def setdefault(self, value):
+        """Assigns value to the node if one is not set then returns it."""
+        if self._node.value is _EMPTY:
+            self._node.value = value
+        return self._node.value
+
+    def __repr__(self):
+        return '(%r: %r)' % (self.key, self.value)
+
+    @property
+    def key(self):
+        """Node’s key."""
+        if not hasattr(self, '_Step__key'):
+            # pylint:disable=protected-access,attribute-defined-outside-init
+            self.__key = self._trie._key_from_path(self._path[:self._pos])
+        return self.__key
+
+    @property
+    def value(self):
+        """Node's value; on read, raises KeyError if node has no value."""
+        v = self._node.value
+        if v is _EMPTY:
+            raise ShortKeyError(self.key)
+        return v
+
+    @value.setter
+    def value(self, value):
+        self._node.value = value
+
+    def __getitem__(self, index):
+        """Makes object appear like a (key, value) tuple.
+
+        This is deprecated.  Prefer :attr:`Trie._Step.key` and
+        :attr:`Trie._Step.value` properties or :func:`Trie._Step.get`
+        method.
+
+        Args:
+            index: Element index to return.
+
+        Returns:
+            ``self.key`` if ``index`` is 0 or ``self.value`` if ``index`` is
+            1.
+
+        Raises:
+            IndexError: if ``index`` is not 0 or 1.
+            KeyError: if ``index`` is 1 and the node has no value.
+        """
+        _warnings.warn(
+            'Indexed access to _Step is deprecated; use `step.key` and'
+            ' `step.value` instead.',
+            DeprecationWarning)
+        if index == 0:
+            return self.key
+        if index == 1:
+            return self.value
+        raise IndexError('index out of range')
+
+_NONE_STEP = _NoneStep()
+
+
 class Trie(_abc.MutableMapping):
     """A trie implementation with dict interface plus some extensions.
 
@@ -1079,178 +1253,8 @@ class Trie(_abc.MutableMapping):
             raise ShortKeyError(key)
         self._pop_value(trace)
 
-    class _NoneStep:
-        """Representation of a non-existent step towards non-existent node.
-
-        The class is private because it should not be constructed by external
-        code.  Objects of this type are returned by :class:`Trie` methods
-        :func:`Trie.shortest_prefix` and :func:`Trie.longest_prefix`.
-        """
-        __slots__ = ()
-
-        def __bool__(self):
-            return False
-
-        def get(self, default=None):
-            return default
-
-        is_set = has_subtrie = False
-
-        @property
-        def key(self):
-            """None; in the future will raise :class:`KeyError`."""
-            _warnings.warn(
-                '_NoneStep.key will soon raise KeyError; use `bool(step)` to'
-                ' check whether step is real or _NoneStep.',
-                DeprecationWarning)
-
-        @property
-        def value(self):
-            """None; in the future will raise :class:`KeyError`."""
-            _warnings.warn(
-                '_NoneStep.value will soon raise KeyError; use'
-                ' `step.get(default)` to get value of a step.',
-                DeprecationWarning)
-
-        def __getitem__(self, index):
-            """Makes object appear like a ``(key, value)`` tuple.
-
-            This is deprecated.  Prefer ``bool(self)`` to detect whether this is
-            a :class:`Trie._Step` or ``_NoneStep``; and :func:`Trie._Step.get`
-            to get value of the node.
-
-            Args:
-                index: Element index to return.
-
-            Returns:
-                ``None`` if ``index`` is 0 or 1.
-
-            Raises:
-                IndexError: if ``index`` is not 0 or 1.
-            """
-            if index == 0:
-                _warnings.warn(
-                    'Indexed access to _NoneStep is deprecated; use'
-                    ' `bool(step)` to check whether step is real or _NoneStep.',
-                    DeprecationWarning)
-                return None
-            if index == 1:
-                _warnings.warn(
-                    'Indexed access to _NoneStep is deprecated; use'
-                    ' `step.get(default)` to get value of a step.',
-                    DeprecationWarning)
-                return None
-            raise IndexError('index out of range')
-
-        def __repr__(self):
-            return '(None Step)'
-
-        def __setattr__(self, key, value):
-            raise AttributeError('_NoneStep is read only')
-
-    class _Step:
-        """Representation of a single step on a path towards particular node.
-
-        *Note:* Reading ``value`` property of this class may raise
-        :class:`KeyError` if the node at the step does not have a value.
-        Writing the property always succeeds.  :func:`Trie._Step.get` returns
-        value or default and always succeeds.
-
-        The class is private because it should not be constructed by external
-        code.  Objects of this type are returned by :class:`Trie` methods such
-        as :func:`Trie.prefixes` and :func:`Trie.walk_towards`.
-        """
-        __slots__ = ('_trie', '_path', '_pos', '_node', '__key')
-
-        def __init__(self, trie, path, pos, node):
-            self._trie = trie
-            self._path = path
-            self._pos = pos
-            self._node = node
-
-        def __bool__(self):
-            return True
-
-        @property
-        def is_set(self):
-            """Whether the node has value assigned to it."""
-            return self._node.value is not _EMPTY
-
-        @property
-        def has_subtrie(self):
-            """Whether the node has any children."""
-            return bool(self._node.children)
-
-        def get(self, default=None):
-            """Returns node's value or the default if value is not assigned."""
-            v = self._node.value
-            return default if v is _EMPTY else v
-
-        def set(self, value):
-            """Deprecated.  Use ``step.value = value`` instead."""
-            _warnings.warn(
-                '_Step.set() is deprecated; use `step.value = expr` instead.',
-                DeprecationWarning)
-            self._node.value = value
-
-        def setdefault(self, value):
-            """Assigns value to the node if one is not set then returns it."""
-            if self._node.value is _EMPTY:
-                self._node.value = value
-            return self._node.value
-
-        def __repr__(self):
-            return '(%r: %r)' % (self.key, self.value)
-
-        @property
-        def key(self):
-            """Node’s key."""
-            if not hasattr(self, '_Step__key'):
-                # pylint:disable=protected-access,attribute-defined-outside-init
-                self.__key = self._trie._key_from_path(self._path[:self._pos])
-            return self.__key
-
-        @property
-        def value(self):
-            """Node's value; on read, raises KeyError if node has no value."""
-            v = self._node.value
-            if v is _EMPTY:
-                raise ShortKeyError(self.key)
-            return v
-
-        @value.setter
-        def value(self, value):
-            self._node.value = value
-
-        def __getitem__(self, index):
-            """Makes object appear like a (key, value) tuple.
-
-            This is deprecated.  Prefer :attr:`Trie._Step.key` and
-            :attr:`Trie._Step.value` properties or :func:`Trie._Step.get`
-            method.
-
-            Args:
-                index: Element index to return.
-
-            Returns:
-                ``self.key`` if ``index`` is 0 or ``self.value`` if ``index`` is
-                1.
-
-            Raises:
-                IndexError: if ``index`` is not 0 or 1.
-                KeyError: if ``index`` is 1 and the node has no value.
-            """
-            _warnings.warn(
-                'Indexed access to _Step is deprecated; use `step.key` and'
-                ' `step.value` instead.',
-                DeprecationWarning)
-            if index == 0:
-                return self.key
-            if index == 1:
-                return self.value
-            raise IndexError('index out of range')
-
-    _NONE_STEP = _NoneStep()
+    _NoneStep = _NoneStep
+    _Step = _Step
 
     def walk_towards(self, key):
         """Yields nodes on the path to given node.
@@ -1259,8 +1263,8 @@ class Trie(_abc.MutableMapping):
             key: Key of the node to look for.
 
         Yields:
-            :class:`pygtrie.Trie._Step` objects which can be used to extract or
-            set node's value as well as get node's key.
+            :class:`pygtrie._Step` objects which can be used to extract or set
+            node's value as well as get node's key.
 
             When representing nodes with assigned values, the objects can be
             treated as ``(k, value)`` pairs denoting keys with associated values
@@ -1278,7 +1282,7 @@ class Trie(_abc.MutableMapping):
         path = self.__path_from_key(key)
         pos = 0
         while True:
-            yield self._Step(self, path, pos, node)
+            yield _Step(self, path, pos, node)
             if pos == len(path):
                 break
             # pylint thinks node.children is always _NoChildren and thus that
@@ -1306,8 +1310,8 @@ class Trie(_abc.MutableMapping):
             key: Key to look for.
 
         Yields:
-            :class:`pygtrie.Trie._Step` objects which can be used to extract or
-            set node's value as well as get node's key.
+            :class:`pygtrie._Step` objects which can be used to extract or set
+            node's value and get its key.
 
             The objects can be treated as ``(k, value)`` pairs denoting keys
             with associated values encountered on the way towards the specified
@@ -1349,17 +1353,16 @@ class Trie(_abc.MutableMapping):
             key: Key to look for.
 
         Returns:
-            :class:`pygtrie.Trie._Step` object (which can be used to extract or
-            set node's value as well as get node's key), or
-            a :class:`pygtrie.Trie._NoneStep` object (which is falsy value
-            simulating a _Step with ``None`` key and value) if no prefix is
-            found.
+            :class:`pygtrie._Step` object (which can be used to extract or set
+            node's value and get its key), or a :class:`pygtrie._NoneStep`
+            object (which is falsy value simulating a _Step with ``None`` key
+            and value) if no prefix is found.
 
             The object can be treated as ``(key, value)`` pair denoting key with
             associated value of the prefix.  This is deprecated, prefer using
             ``key`` and ``value`` properties of the object.
         """
-        return next(self.prefixes(key), self._NONE_STEP)
+        return next(self.prefixes(key), _NONE_STEP)
 
     def longest_prefix(self, key):
         """Finds the longest prefix of a key with a value.
@@ -1389,17 +1392,16 @@ class Trie(_abc.MutableMapping):
             key: Key to look for.
 
         Returns:
-            :class:`pygtrie.Trie._Step` object (which can be used to extract or
+            :class:`pygtrie._Step` object (which can be used to extract or
             set node's value as well as get node's key), or
-            a :class:`pygtrie.Trie._NoneStep` object (which is falsy value
-            simulating a _Step with ``None`` key and value) if no prefix is
-            found.
+            a :class:`pygtrie._NoneStep` object (which is falsy value simulating
+            a _Step with ``None`` key and value) if no prefix is found.
 
             The object can be treated as ``(key, value)`` pair denoting key with
             associated value of the prefix.  This is deprecated, prefer using
             ``key`` and ``value`` properties of the object.
         """
-        ret = self._NONE_STEP
+        ret = _NONE_STEP
         for ret in self.prefixes(key):
             pass
         return ret
