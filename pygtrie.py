@@ -874,13 +874,13 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     Keys used with the class must be iterables of hashable objects.  In other
     words, for a given key, ``dict.fromkeys(key)`` must be valid expression.  In
     particular, strings work well as keys, however getting them back (for
-    example via :func:`Trie.iterkeys` method), instead of strings, tuples of
+    example via :func:`iterkeys` method), instead of strings, tuples of
     characters are produced.
 
     Subclasses can modify the way keys are iterated over by overriding
-    :func:`Trie._path_from_key` and :func:`Trie._key_from_path`.  For example,
-    consider a trie whose keys are positive integers which are split into their
-    unique factors::
+    :func:`_path_from_key` and :func:`_key_from_path`.  For example, consider
+    a trie whose keys are positive integers which are split into their unique
+    factors::
 
         class FactorsTrie(pygtrie.Trie[int, V, int]):
 
@@ -911,6 +911,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     """
 
     _root: _Node[S, V]
+    _items_callback: _t.Callable[[_AnyChildren[S, V]],
+                                 _t.Iterable[tuple[S, _Node[S, V]]]]
 
     def __init__(self,
                  other: _abc.Mapping[K, V] | _t.Iterable[tuple[K, V]]=(),
@@ -918,8 +920,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                  **kwargs: V) -> None:
         """Initialises the trie.
 
-        Arguments are interpreted the same way :func:`Trie.update` interprets
-        them.
+        Arguments are interpreted the same way :func:`update` interprets them.
         """
         self._root = _Node()
         self._items_callback = self._ITEMS_CALLBACKS[0]
@@ -931,9 +932,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Enables sorting the child nodes when iterating and traversing.
 
         Normally, child nodes are not sorted when iterating or traversing over
-        the trie (just like dict elements are not sorted).  This method allows
-        sorting to be enabled (which was the behaviour prior to pygtrie 2.0
-        release).
+        the trie (just like :class:`dict` elements are not sorted).  This method
+        allows sorting to be enabled (which was the behaviour prior to pygtrie
+        2.0 release).
 
         For Trie class, enabling sorting the child nodes is identical to sorting
         the list of items since Trie returns keys as tuples.  However, in
@@ -977,8 +978,12 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                **kwargs: V) -> None:
         """Updates stored values.  Works like :meth:`dict.update`.
 
-        **Typing:** Passing keyword arguments is valid only if keys of the trie
-        are strings, i.e. if ``K`` is :class:`str`.
+        Args:
+            other: Mapping or iterable of ``(key, value)`` pairs to update the
+                trie with.
+            **kwargs: Mapping from strings (names of keyword arguments) to
+                values.  May be specified if the trie’s keys accept strings
+                only.
         """
         if isinstance(other, Trie):
             # MutableMapping.update() does `for key in other: self[key] =
@@ -1071,7 +1076,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     def fromkeys(
             cls, keys: _t.Iterable[K], value: V | None=None
     ) -> _t.Union['Trie[K, V, S]', 'Trie[K, V | None, S]']:
-        """Creates a new trie with given keys set.
+        """Returns a new trie with given ``keys`` set to provided ``value``.
 
         This is equivalent to calling the constructor with a ``(key, value) for
         key in keys`` generator.
@@ -1084,9 +1089,6 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             keys: An iterable of keys that should be set in the new trie.
             value: Value to associate with given keys.  The value is not copied;
                 all keys reference the same object.
-
-        Returns:
-            A new trie where each key from ``keys`` is set to the given value.
         """
         trie = cls()
         for key in keys:
@@ -1188,10 +1190,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             >>> sorted(t.items())
             [('foo', 'Foo'), ('foo/bar/baz', 'Baz'), ('qux', 'Qux')]
 
-        Items are generated in topological order (i.e. parents before child
-        nodes) but the order of siblings is unspecified.  At the expense of
-        efficiency, :func:`Trie.enable_sorting` method can make ordering of
-        siblings deterministic.
+        Items are output in topological order (i.e. parents before children) but
+        the order of siblings is unspecified.  At the expense of efficiency,
+        :func:`enable_sorting` can make ordering of siblings deterministic.
 
         With ``prefix`` argument, only items with specified prefix are generated
         (i.e. only given subtrie is traversed) as demonstrated by::
@@ -1227,7 +1228,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Yields all keys having associated values with given prefix.
 
         This is equivalent to taking first element of tuples generated by
-        :func:`Trie.iteritems`.
+        :func:`iteritems`.
 
         Args:
             prefix: If given, prefix to limit iteration to.
@@ -1249,7 +1250,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Yields all values associated with keys with given prefix.
 
         This is equivalent to taking second element of tuples generated by
-        :func:`Trie.iteritems`.
+        :func:`iteritems`.
 
         Args:
             prefix: If given, prefix to limit iteration to.
@@ -1278,7 +1279,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Returns a list of ``(key, value)`` pairs in given subtrie.
 
         This is equivalent to constructing a list from generator returned by
-        :func:`Trie.iteritems`.
+        :func:`iteritems`.
         """
         return list(self.iteritems(prefix=prefix, shallow=shallow))
 
@@ -1288,7 +1289,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Returns a list of all the keys, with given prefix, in the trie.
 
         This is equivalent to constructing a list from generator returned by
-        :func:`Trie.iterkeys`.
+        :func:`iterkeys`.
         """
         return list(self.iterkeys(prefix=prefix, shallow=shallow))
 
@@ -1298,7 +1299,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Returns a list of values in given subtrie.
 
         This is equivalent to constructing a list from generator returned by
-        :func:`Trie.itervalues`.
+        :func:`itervalues`.
         """
         return list(self.itervalues(prefix=prefix, shallow=shallow))
 
@@ -1345,9 +1346,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             True
 
         There are two higher level methods built on top of this one which give
-        easier interface for the information. :func:`Trie.has_key` returns
-        whether node has a value associated with it and :func:`Trie.has_subtrie`
-        checks whether node is a prefix.  Continuing previous example::
+        easier interface for the information. :func:`has_key` returns whether
+        node has a value associated with it and :func:`has_subtrie` checks
+        whether node is a prefix.  Continuing previous example::
 
             >>> t.has_key('qux'), t.has_subtrie('qux')
             (False, False)
@@ -1374,12 +1375,12 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
     def has_key(self, key: K) -> bool:
         """Indicates whether given key has value associated with it.
-        Cf. :func:`Trie.has_node`."""
+        Cf. :func:`has_node`."""
         return bool(self.has_node(key) & self.HAS_VALUE)
 
     def has_subtrie(self, key: K) -> bool:
         """Returns whether given key is a prefix of another key in the trie.
-        Cf. :func:`Trie.has_node`."""
+        Cf. :func:`has_node`."""
         return bool(self.has_node(key) & self.HAS_SUBTRIE)
 
     @staticmethod
@@ -1417,8 +1418,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         no value associated with it).
 
         When argument is a slice, it must be one with only ``start`` set in
-        which case the access is identical to :func:`Trie.itervalues` invocation
-        with prefix argument.
+        which case the access is identical to :func:`itervalues` invocation with
+        prefix argument.
 
         Example:
 
@@ -1498,8 +1499,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     def setdefault(self, key: K, default: V | None=None) -> V | None:
         """Sets value of a given node if not set already.  Also returns it.
 
-        In contrast to :func:`Trie.__setitem__`, this method does not accept
-        slice as a key.
+        In contrast to :func:`__setitem__`, this method does not accept slice as
+        a key.
 
         **Typing:** Calling the method without ``default`` argument specified is
         valid only if the trie can store ``None`` values (i.e. when the trie’s
@@ -1514,8 +1515,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
         Args:
             trace: Trace to the node to cleanup as returned by
-                :func:`Trie._get_node`.  The last element of the trace denotes
-                the node to get value of.
+                :func:`_get_node`.  The last element of the trace denotes the
+                node to get value of.
 
         Returns:
             Value which was held in the node at the end of specified trace.
@@ -1711,8 +1712,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Finds the shortest prefix of a key with a value.
 
         This is equivalent to taking the first item yielded by the
-        :func:`Trie.prefixes` method with additional handling of situations when
-        no prefixes are found.
+        :func:`prefixes` method with additional handling of situations when no
+        prefixes are found.
 
         Example:
 
@@ -1745,8 +1746,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Finds the longest prefix of a key with a value.
 
         This is equivalent to taking the last item yielded by the
-        :func:`Trie.prefixes` method with additional handling of situations when
-        no prefixes are found.
+        :func:`prefixes` method with additional handling of situations when no
+        prefixes are found.
 
         Example:
 
@@ -1896,8 +1897,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             key: User supplied key or ``_SENTINEL``.
 
         Returns:
-            An empty tuple if ``key`` was ``_SENTINEL``, otherwise whatever
-            :func:`Trie._path_from_key` returns.
+            An empty tuple if ``key`` is ``_SENTINEL``, otherwise whatever
+            :func:`_path_from_key` returns.
 
         Raises:
             TypeError: If ``key`` is of invalid type.
@@ -1908,8 +1909,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Converts a user visible key object to internal path representation.
 
         The default implementation returns the key.  Subclasses may override
-        this method (together with :func:`Trie._key_from_path`) to support
-        keys of other types, e.g. splitting a string key into path components.
+        this method (together with :func:`_key_from_path`) to support keys of
+        other types, e.g. splitting a string key into path components.
 
         Args:
             key: User supplied key.
@@ -1918,7 +1919,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             A path, which is an iterable of steps.  Each step must be hashable.
 
         Raises:
-            TypeError: If key is of invalid type.
+            TypeError: If ``key`` is of invalid type.
         """
         return _t.cast(_t.Sequence[S], key)
 
@@ -1926,7 +1927,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Converts an internal path into a user visible key object.
 
         The default implementation creates a tuple from the path.  Subclasses
-        may override this method (together with :func:`Trie._path_from_key`) to
+        may override this method (together with :func:`_path_from_key`) to
         support keys of other types, e.g. splitting a string key into path
         components.
 
@@ -1966,8 +1967,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         node has children, ``children`` value remains truthy even after the
         iterator has been exhausted).
 
-        :func:`Trie.traverse` has two advantages over :func:`Trie.iteritems` and
-        similar methods:
+        :func:`traverse` has two advantages over :func:`iteritems` and similar
+        methods:
 
         1. it allows subtries to be skipped completely when going through the
            list of nodes based on the property of the parent node; and
@@ -2063,7 +2064,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             root_dir: Directory = typing.cast(
                 Directory, t.traverse(traverse_callback, prefix='.'))
 
-        Note: Unlike iterators (e.g. returned by :func:`Trie.iteritems`), using
+        Note: Unlike iterators (e.g. returned by :func:`iteritems`), using
         ``traverse`` may raise an exception when used on a deep trie.  This may
         happen when Python’s maximum recursion depth is reached.  To address
         this, ``children`` iteration may be done non-recursively outside of the
@@ -2139,29 +2140,25 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
 
 class CharTrie(Trie[str, V, str]):
-    """A variant of a :class:`Trie` which accepts strings as keys.
+    """:class:`Trie` which accepts and returns strings as keys.
 
-    The only difference between :class:`CharTrie` and :class:`Trie` is that when
-    :class:`CharTrie` returns keys back to the client (for instance when
-    :func:`Trie.keys` method is called), those keys are returned as strings.
-
-    A common example where this class can be used is a dictionary of words in
-    a natural language.  For example::
+    The only difference between :class:`CharTrie` and :class:`Trie` is that
+    :class:`CharTrie` returns keys (for instance when :func:`Trie.keys` method
+    is called) as strings, whereas :class:`Trie` returns keys as tuples.  For
+    example, compare::
 
         >>> import pygtrie
+        >>> t = pygtrie.Trie()
+        >>> t['foo'] = True
+        >>> t['bar'] = True
+        >>> t.keys()
+        [('f', 'o', 'o'), ('b', 'a', 'r')]
+
         >>> t = pygtrie.CharTrie()
-        >>> t['wombat'] = True
-        >>> t['woman'] = True
-        >>> t['man'] = True
-        >>> t['manhole'] = True
-        >>> t.has_subtrie('wo')
-        True
-        >>> t.has_key('man')
-        True
-        >>> t.has_subtrie('man')
-        True
-        >>> t.has_subtrie('manhole')
-        False
+        >>> t['foo'] = True
+        >>> t['bar'] = True
+        >>> t.keys()
+        ['foo', 'bar']
     """
 
     def _key_from_path(self, path: _t.Iterable[str]) -> str:
@@ -2169,10 +2166,10 @@ class CharTrie(Trie[str, V, str]):
 
 
 class StringTrie(Trie[str, V, str]):
-    """:class:`Trie` variant accepting strings with a separator as keys.
+    """:class:`Trie` which accepts strings with a separator as keys.
 
-    The trie accepts strings as keys which are split into components using
-    a separator specified during initialisation (forward slash, i.e. ``/``, by
+    This trie accepts strings as keys which are split into components (or steps)
+    using a separator specified during initialisation (forward slash by
     default).
 
     A common example where this class can be used is when keys are paths.  For
@@ -2207,9 +2204,7 @@ class StringTrie(Trie[str, V, str]):
         Args:
             other: Passed to super class initialiser.
             separator: A separator to use when splitting keys into paths used by
-                the trie.  "/" is used if this argument is not specified.  This
-                named argument is not specified on the function’s prototype
-                because of Python’s limitations.
+                the trie.
             **kwargs: Passed to super class initialiser.
 
         Raises:
@@ -2242,6 +2237,22 @@ class StringTrie(Trie[str, V, str]):
             value: V | None=None,
             separator: str='/',
     ) -> _t.Union['StringTrie[V]', 'StringTrie[V | None]']:
+        """Returns a new trie with given ``keys`` set to provided ``value``.
+
+        This is equivalent to calling the constructor with a ``(key, value) for
+        key in keys`` generator.
+
+        **Typing:** Calling the method without ``value`` argument specified is
+        valid only if the trie can store ``None`` values (i.e. when the trie’s
+        ``V`` generic argument accepts ``None``).
+
+        Args:
+            keys: An iterable of keys that should be set in the new trie.
+            value: Value to associate with given keys.  The value is not copied;
+                all keys reference the same object.
+            separator: A separator to use when splitting keys into paths used by
+                the trie.
+        """
         trie = cls(separator=separator)
         for key in keys:
             trie[key] = _t.cast(V, value)
