@@ -183,7 +183,7 @@ autodoc_preserve_defaults = True
 
 nitpicky = True
 nitpick_ignore_regex = {
-    (r'py:class', r'^pygtrie\.(?:[KVST]|_Sentinel)$'),
+    (r'py:class', r'^pygtrie\.(?:[KVST]|SupportsKeysAndGetItem)\b'),
 }
 
 
@@ -235,7 +235,9 @@ def sphinx_inspect_define_patch(
     value = sphinx.pycode.ast.unparse(arg.annotation, code)
     if value:
         value = value.replace(' | ~pygtrie._Sentinel', '')
-        value = re.sub(r'\b([KV])_contra\b', r'\1', value).strip()
+        value = value.replace('pygtrie._SupportsKeysAndGetItem',
+                              'pygtrie.SupportsKeysAndGetItem')
+        value = re.sub(r'\b(pygtrie\.[KV])_contra\b', r'\1', value).strip()
     annotation = value or inspect.Parameter.empty
 
     return inspect.Parameter(

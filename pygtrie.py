@@ -50,8 +50,17 @@ K = _t.TypeVar('K')
 V = _t.TypeVar('V')
 K_contra = _t.TypeVar('K_contra', contravariant=True)
 V_contra = _t.TypeVar('V_contra', contravariant=True)
+V_co = _t.TypeVar('V_co', covariant=True)
 S = _t.TypeVar('S')
 T = _t.TypeVar('T')
+
+
+class _SupportsKeysAndGetItem(_t.Protocol[K, V_co]):
+    def keys(self) -> _t.Iterable[K]: ...
+    def __getitem__(self, key: K, /) -> V_co: ...
+
+_Other = _SupportsKeysAndGetItem[K, V] | _t.Iterable[tuple[K, V]]
+
 
 
 class _MakeCopy(_t.Protocol):
@@ -914,10 +923,21 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     _items_callback: _t.Callable[[_AnyChildren[S, V]],
                                  _t.Iterable[tuple[S, _Node[S, V]]]]
 
-    def __init__(self,
-                 other: _abc.Mapping[K, V] | _t.Iterable[tuple[K, V]]=(),
-                 /,
-                 **kwargs: V) -> None:
+    # TODO(mpn): I’ve tried adding overloads analogous to the ones in update
+    # method, but run into issues.  In `__copy`, mypy complained about the
+    # `cpy._root = …` line:
+    #
+    # > error: Incompatible types in assignment (expression has type
+    # > "_Node[S, V]", variable has type "_Node[Never, Never]")  [assignment]
+    #
+    # In `fromkeys`, mypy complained about construction of the trie:
+    #
+    # > error: Need type annotation for "trie"  [var-annotated]
+    #
+    # I think this may have something to do with `S` not being part of the
+    # constructor signature, though honestly I dunno.  Further investigation is
+    # necessary.
+    def __init__(self, other: _Other[K, V]=(), /, **kwargs: V) -> None:
         """Initialises the trie.
 
         Arguments are interpreted the same way :func:`update` interprets them.
@@ -927,6 +947,36 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         self.update(other, **kwargs)
 
     _ITEMS_CALLBACKS = (lambda x: x.items(), lambda x: x.sorted_items())
+
+    @_t.overload
+    def update(self, other: _SupportsKeysAndGetItem[K, V], /) -> None: ...
+    @_t.overload
+    def update(self, other: _t.Iterable[tuple[K, V]]=(), /) -> None: ...
+    @_t.overload
+    def update(self: 'Trie[K | str, V, S]',
+               other: _SupportsKeysAndGetItem[K, V],
+               /, **kwargs: V) -> None: ...
+    @_t.overload
+    def update(self: 'Trie[K | str, V, S]',
+               other: _t.Iterable[tuple[K, V]]=(),
+               /, **kwargs: V) -> None: ...
+    def update(self, other: _Other[K, V]=(), /, **kwargs: V) -> None:
+        """Updates stored values.  Works like :meth:`dict.update`.
+
+        Args:
+            other: Mapping or iterable of ``(key, value)`` pairs to update the
+                trie with.
+            **kwargs: Mapping from strings (names of keyword arguments) to
+                values.  May be specified if the trie’s keys accept strings
+                only.
+        """
+        if isinstance(other, Trie):
+            # MutableMapping.update() does `for key in other: self[key] =
+            # other[key]` which performs key lookup twice.  If we’re dealing
+            # with a Trie, that’s quite expensive so convert `other` to an
+            # iterator over items of the trie.
+            other = other.items()
+        super().update(other, **kwargs)
 
     def enable_sorting(self, enable: bool=True) -> None:
         """Enables sorting the child nodes when iterating and traversing.
@@ -966,32 +1016,6 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     def clear(self) -> None:
         """Removes all the values from the trie."""
         self._root = _Node()
-
-    # TODO(mpn): mypy uses `other: SupportsKeysAndGetItem[K, V]` signature for
-    # `MutableMapping.update`, but `SupportsKeysAndGetItem` is not something
-    # that’s exposed in `typing`, `collections.abc` or anywhere else (as far as
-    # I can tell).  Not being able to use it, we end up with a mismatched
-    # override and are forced to ignore it.  Is there a better way?
-    def update(self,  # type: ignore[override]
-               other: _abc.Mapping[K, V] | _t.Iterable[tuple[K, V]] = (),
-               /,
-               **kwargs: V) -> None:
-        """Updates stored values.  Works like :meth:`dict.update`.
-
-        Args:
-            other: Mapping or iterable of ``(key, value)`` pairs to update the
-                trie with.
-            **kwargs: Mapping from strings (names of keyword arguments) to
-                values.  May be specified if the trie’s keys accept strings
-                only.
-        """
-        if isinstance(other, Trie):
-            # MutableMapping.update() does `for key in other: self[key] =
-            # other[key]` which performs key lookup twice.  If we’re dealing
-            # with a Trie, that’s quite expensive so convert `other` to an
-            # iterator over items of the trie.
-            other = other.items()
-        super().update(other, **kwargs)
 
     def merge(self, other: 'Trie[K, V, S]', overwrite: bool=False) -> None:
         """Moves nodes from other trie into this one.
@@ -1172,8 +1196,6 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
     def __iter__(self) -> _t.Iterator[K]:
         return self.iterkeys()
-
-    # pylint: disable=arguments-differ
 
     def iteritems(self,
                   prefix: K | _Sentinel=_SENTINEL,
@@ -1493,9 +1515,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             node.children = _NoChildren()
 
     @_t.overload
-    def setdefault(self, key: K) -> V | None: ...
+    def setdefault(self: 'Trie[K, V | None, S]', key: K) -> V | None: ...
     @_t.overload
-    def setdefault(self, key: K, default: V) -> V: ...  # pylint: disable=signature-differs
+    def setdefault(self, key: K, default: V) -> V: ...
     def setdefault(self, key: K, default: V | None=None) -> V | None:
         """Sets value of a given node if not set already.  Also returns it.
 
@@ -2226,7 +2248,7 @@ class StringTrie(Trie[str, V, str]):
                  separator: str='/') -> 'StringTrie[V | None]': ...
     @_t.overload
     @classmethod
-    def fromkeys(cls,  # pylint: disable=arguments-differ
+    def fromkeys(cls,
                  keys: _t.Iterable[str],
                  value: V,
                  separator: str='/') -> 'StringTrie[V]': ...
