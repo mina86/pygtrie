@@ -9,10 +9,6 @@ pygtrie
    :target: http://pygtrie.readthedocs.io/en/stable/
    :alt: Documentation build status (stable)
 
-.. image:: https://api.travis-ci.com/mina86/pygtrie.svg
-   :target: https://travis-ci.com/mina86/pygtrie
-   :alt: Continuous integration status
-
 pygtrie is a pure Python implementation of a trie data structure
 compatible with Python 2.x and Python 3.x.
 

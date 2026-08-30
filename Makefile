@@ -1,8 +1,12 @@
 all: test lint mypy coverage docs build
 
-test: test.py pygtrie.py
-	python3 -X dev $<
-	python3 -X dev -m doctest pygtrie.py
+test: pytest doctest
+
+pytest: test.py
+	if which pytest >/dev/null 2>&1; then pytest $<; else python3 $<; fi
+
+doctest: pygtrie.py
+	python3 -m doctest $<
 
 lint: .pylintrc pygtrie.py test.py example.py
 	lint=$$(which pylint3 2>/dev/null) || lint=$$(which pylint) && \
@@ -21,4 +25,4 @@ build:
 docs:
 	python3 setup.py build_doc
 
-.PHONY: all test lint coverage build docs
+.PHONY: all build coverage docs doctest lint mypy pytest test
