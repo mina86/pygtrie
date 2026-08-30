@@ -108,8 +108,10 @@ class _FalsyIterator(_NoCopy):
     """An empty iterator which is in addition falsy."""
     __slots__ = ()
 
+    __instance: _t.Self
+
     def __new__(cls) -> _t.Self:
-        return cls.__instance  # type: ignore  # pylint: disable=no-member
+        return cls.__instance
 
     def __bool__(self) -> _t.Literal[False]:
         return False
@@ -194,8 +196,10 @@ class _NoChildren(_AnyChildren[S, V], _NoCopy):
     """Collection representing lack of any children."""
     __slots__ = ()
 
+    __instance: _t.Self
+
     def __new__(cls) -> _t.Self:
-        return cls.__instance  # type: ignore  # pylint: disable=no-member
+        return cls.__instance
 
     def __bool__(self) -> _t.Literal[False]:
         return False
@@ -265,7 +269,10 @@ class _OneChild(_AnyChildren[S, V]):
 
     def add(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
         node: _Node[S, V]  = _Node()
-        parent.children = _Children((self.step, self.node), (step, node))
+        parent.children = _Children({
+            self.step: self.node,
+            step: node
+        })
         return node
 
     def require(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
@@ -280,7 +287,7 @@ class _OneChild(_AnyChildren[S, V]):
             queue.append((self.node, other.node))
             return self
         elif other:
-            children: _Children[S, V] = _Children((self.step, self.node))
+            children: _Children[S, V] = _Children({ self.step: self.node })
             children.merge(other, queue)
             return children
         else:
@@ -303,8 +310,8 @@ class _Children(_AnyChildren[S, V]):
     __slots__ = ('_nodes',)
     _nodes: dict[S, '_Node[S, V]']
 
-    def __init__(self, *items: tuple[S, '_Node[S, V]']) -> None:
-        self._nodes = dict(items)
+    def __init__(self, nodes: dict[S, '_Node[S, V]']) -> None:
+        self._nodes = nodes
 
     def __bool__(self) -> _t.Literal[True]:
         return True
@@ -352,12 +359,10 @@ class _Children(_AnyChildren[S, V]):
     def copy(self,
              make_copy: _MakeCopy,
              queue: list[_t.Iterable['_Node[S, V]']]) -> '_Children[S, V]':
-        # pylint: disable=protected-access
-        cpy: _Children[S, V] = _Children()
-        cpy._nodes.update((make_copy(step), node.shallow_copy(make_copy))
-                         for step, node in self.items())
-        queue.append(cpy._nodes.values())
-        return cpy
+        nodes = {make_copy(step): node.shallow_copy(make_copy)
+                 for step, node in self.items()}
+        queue.append(nodes.values())
+        return _Children(nodes)
 
 
 class NodeFactory(_t.Protocol[K_contra, V_contra, S, T]):
@@ -551,8 +556,6 @@ class _Node(_t.Generic[S, V]):
                     return True
                 except KeyError:
                     return False
-
-    __hash__ = None  # type: ignore[assignment]
 
     def shallow_copy(self, make_copy: _MakeCopy) -> '_Node[S, V]':
         """Returns a copy of the node which shares the children property."""
@@ -793,7 +796,7 @@ class _Step(_t.Generic[K, V, S]):
     def key(self) -> K:
         """Node’s key."""
         if not hasattr(self, '_Step__key'):
-            # pylint:disable=protected-access,attribute-defined-outside-init
+            # pylint: disable=protected-access
             self.__key = self._trie._key_from_path(self._path[:self._pos])
         return self.__key
 
@@ -1073,8 +1076,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                 copied.
         """
         cpy: _t.Self = self.__class__()
-        cpy.__dict__ = self.__dict__.copy()
-        cpy._root = self._root.copy(make_copy) # pylint: disable=protected-access
+        cpy.__dict__ = dict(self.__dict__, _root=self._root.copy(make_copy))
         return cpy
 
     def copy(self) -> _t.Self:
@@ -1136,8 +1138,6 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         node = self._root
         trace: list[tuple[S | None, _Node[S, V]]] = [(None, node)]
         for step in self.__path_from_key(key):
-            # pylint thinks node.children is always _NoChildren and thus that
-            # we’re assigning None here; pylint: disable=assignment-from-none
             n = node.children.get(step)
             if n is None:
                 raise KeyError(key)
@@ -1686,8 +1686,6 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             yield _Step(self, path, pos, node)
             if pos == len(path):
                 break
-            # pylint thinks node.children is always _NoChildren and thus that
-            # we’re assigning None here; pylint: disable=assignment-from-none
             n = node.children.get(path[pos])
             if n is None:
                 raise KeyError(key)
@@ -2341,20 +2339,16 @@ class PrefixSet(_t.Generic[K, S], _abc.MutableSet[K]):
 
     def copy(self) -> _t.Self:
         """Returns a shallow copy of the object."""
-        # pylint: disable=protected-access
         cpy = self.__class__()
-        cpy.__dict__ = self.__dict__.copy()
-        cpy._trie = self._trie.copy()
+        cpy.__dict__ = dict(self.__dict__, _trie=self._trie.copy())
         return cpy
 
     def __copy__(self) -> _t.Self:
         return self.copy()
 
     def __deepcopy__(self, memo: _t.Any) -> _t.Self:
-        # pylint: disable=protected-access
         cpy = self.__class__()
-        cpy.__dict__ = self.__dict__.copy()
-        cpy._trie = self._trie.__deepcopy__(memo)
+        cpy.__dict__ = dict(self.__dict__, _trie=self._trie.__deepcopy__(memo))
         return cpy
 
     def clear(self) -> None:
