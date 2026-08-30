@@ -923,20 +923,19 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     _items_callback: _t.Callable[[_AnyChildren[S, V]],
                                  _t.Iterable[tuple[S, _Node[S, V]]]]
 
-    # TODO(mpn): I’ve tried adding overloads analogous to the ones in update
-    # method, but run into issues.  In `__copy`, mypy complained about the
-    # `cpy._root = …` line:
-    #
-    # > error: Incompatible types in assignment (expression has type
-    # > "_Node[S, V]", variable has type "_Node[Never, Never]")  [assignment]
-    #
-    # In `fromkeys`, mypy complained about construction of the trie:
-    #
-    # > error: Need type annotation for "trie"  [var-annotated]
-    #
-    # I think this may have something to do with `S` not being part of the
-    # constructor signature, though honestly I dunno.  Further investigation is
-    # necessary.
+    @_t.overload
+    def __init__(self, other: _SupportsKeysAndGetItem[K, V], /) -> None: ...
+    @_t.overload
+    def __init__(self, other: _t.Iterable[tuple[K, V]]=(), /) -> None: ...
+    @_t.overload
+    def __init__(self: 'Trie[K | str, V, S]',
+                 other: _SupportsKeysAndGetItem[K, V], /,
+                 **kwargs: V) -> None: ...
+    @_t.overload
+    def __init__(self: 'Trie[K | str, V, S]',
+                 other: _t.Iterable[tuple[K, V]]=(), /,
+                 **kwargs: V) -> None: ...
+
     def __init__(self, other: _Other[K, V]=(), /, **kwargs: V) -> None:
         """Initialises the trie.
 
@@ -1073,7 +1072,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             make_copy: Function copying values.  If not given, values won’t be
                 copied.
         """
-        cpy = self.__class__()
+        cpy: _t.Self = self.__class__()
         cpy.__dict__ = self.__dict__.copy()
         cpy._root = self._root.copy(make_copy) # pylint: disable=protected-access
         return cpy
@@ -1114,10 +1113,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             value: Value to associate with given keys.  The value is not copied;
                 all keys reference the same object.
         """
-        trie = cls()
-        for key in keys:
-            trie[key] = _t.cast(V, value)
-        return trie
+        v = _t.cast(V, value)
+        return cls((key, v) for key in keys)
 
     def _get_node(self, key: K | _Sentinel) -> tuple[_Node[S, V], _Trace[S, V]]:
         """Returns node for given key.  Creates it if requested.
@@ -2214,7 +2211,7 @@ class StringTrie(Trie[str, V, str]):
     """
 
     def __init__(self,
-                 other: _abc.Mapping[str, V] | _t.Iterable[tuple[str, V]]=(),
+                 other: _Other[str, V]=(),
                  /,
                  separator: str='/',
                  **kwargs: V) -> None:
