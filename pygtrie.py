@@ -62,7 +62,6 @@ class _SupportsKeysAndGetItem(_t.Protocol[K, V_co]):
 _Other = _SupportsKeysAndGetItem[K, V] | _t.Iterable[tuple[K, V]]
 
 
-
 class _MakeCopy(_t.Protocol):
     """A callable which copies (or otherwise maps) a value to itself.
 
@@ -268,7 +267,7 @@ class _OneChild(_AnyChildren[S, V]):
         return self.node if step == self.step else None
 
     def add(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
-        node: _Node[S, V]  = _Node()
+        node: _Node[S, V] = _Node()
         parent.children = _Children({
             self.step: self.node,
             step: node
@@ -283,11 +282,11 @@ class _OneChild(_AnyChildren[S, V]):
               queue: list[tuple['_Node[S, V]', '_Node[S, V]']],
               ) -> '_AnyChildren[S, V]':
         # pylint: disable=unidiomatic-typecheck
-        if type(other) == _OneChild and other.step == self.step:
+        if type(other) is _OneChild and other.step == self.step:
             queue.append((self.node, other.node))
             return self
         elif other:
-            children: _Children[S, V] = _Children({ self.step: self.node })
+            children = _Children({ self.step: self.node })
             children.merge(other, queue)
             return children
         else:
@@ -343,8 +342,7 @@ class _Children(_AnyChildren[S, V]):
 
     def merge(self,
               other: '_AnyChildren[S, V]',
-              queue: list[tuple['_Node[S, V]', '_Node[S, V]']],
-    ) -> _t.Self:
+              queue: list[tuple['_Node[S, V]', '_Node[S, V]']]) -> _t.Self:
         for step, other_node in other.items():
             node = self._nodes.setdefault(step, other_node)
             if node is not other_node:
@@ -386,7 +384,7 @@ class NodeFactory(_t.Protocol[K_contra, V_contra, S, T]):
                  key_from_path: _t.Callable[[_t.Iterable[S]], K_contra],
                  path: _t.Sequence[S],
                  children: _t.Iterable[T],
-                 value: V_contra = _SENTINEL,  # type: ignore[assignment]
+                 value: V_contra=_SENTINEL,  # type: ignore[assignment]
                  /) -> T:
         """Processes and transforms a node of a trie.  For more details, see
         :func:`Trie.traverse`.
@@ -435,11 +433,12 @@ class _Node(_t.Generic[S, V]):
             lhs.children = lhs.children.merge(rhs.children, queue)
             rhs.children = _NoChildren()
 
-    def iterate(self,
-                path: list[S],
-                shallow: bool,
-                items: _t.Callable[[_AnyChildren[S, V]],
-                                   _t.Iterable[tuple[S, '_Node[S, V]']]],
+    def iterate(
+            self,
+            path: list[S],
+            shallow: bool,
+            items: _t.Callable[[_AnyChildren[S, V]],
+                               _t.Iterable[tuple[S, '_Node[S, V]']]],
     ) -> _t.Iterator[tuple[list[S], V]]:
         """Yields all the nodes with values associated to them in the trie.
 
@@ -486,8 +485,7 @@ class _Node(_t.Generic[S, V]):
                  key_from_path: _t.Callable[[_t.Iterable[S]], K],
                  path: list[S],
                  items: _t.Callable[[_AnyChildren[S, V]],
-                                    _t.Iterable[tuple[S, '_Node[S, V]']]],
-    ) -> T:
+                                    _t.Iterable[tuple[S, '_Node[S, V]']]]) -> T:
         """Traverses the node and returns another type of node from factory.
 
         Args:
@@ -1060,7 +1058,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         if isinstance(self, type(other)):
             self._merge_impl(self, other, overwrite=overwrite)
         else:
-            other._merge_impl(self, other, overwrite=overwrite) # pylint: disable=protected-access
+            other._merge_impl(self, other, overwrite=overwrite)  # pylint: disable=protected-access
         other.clear()
 
     @classmethod
@@ -1303,8 +1301,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         return list(self.iteritems(prefix=prefix, shallow=shallow))
 
     def keys(self,  # type: ignore[override]
-              prefix: K | _Sentinel=_SENTINEL,
-              shallow: bool=False) -> list[K]:
+             prefix: K | _Sentinel=_SENTINEL,
+             shallow: bool=False) -> list[K]:
         """Returns a list of all the keys, with given prefix, in the trie.
 
         This is equivalent to constructing a list from generator returned by
@@ -1313,8 +1311,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         return list(self.iterkeys(prefix=prefix, shallow=shallow))
 
     def values(self,  # type: ignore[override]
-              prefix: K | _Sentinel=_SENTINEL,
-              shallow: bool=False) -> list[V]:
+               prefix: K | _Sentinel=_SENTINEL,
+               shallow: bool=False) -> list[V]:
         """Returns a list of values in given subtrie.
 
         This is equivalent to constructing a list from generator returned by
@@ -1652,7 +1650,6 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             raise ShortKeyError(key)
         self._pop_value(trace)
 
-
     # Re-exported here mostly for backwards compatibility.
     _Step: _t.TypeAlias = _Step
     _NoneStep: _t.TypeAlias = _NoneStep
@@ -1821,7 +1818,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """
         if self is other:
             return True
-        if type(self) != type(other):
+        if type(self) is not type(other):
             return False
         result = self._eq_impl(other)
         if result is NotImplemented:
@@ -1886,14 +1883,14 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """
         if self is other:
             return True
-        if type(other) == type(self):
+        if type(other) is type(self):
             result = self._eq_impl(other)
             if result is not NotImplemented:
                 return result
         return super().__eq__(other)
 
     def _eq_impl(self, other: _t.Self) -> bool | _types.NotImplementedType:
-        return self._root.equals(other._root) # pylint: disable=protected-access
+        return self._root.equals(other._root)  # pylint: disable=protected-access
 
     def __ne__(self, other: object) -> bool:
         return not self == other
