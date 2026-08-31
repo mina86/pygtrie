@@ -719,11 +719,27 @@ class CharTrieTestCase(TrieTestCase):
                                  factory=pygtrie.CharTrie)
         self.assertUnpickling(want, pickled)
 
-    def test_step_repr(self):
+    def test_step_formatting(self):
         t = self._TRIE_CTOR({'foo': 42, 'foobar': 64})
+
+        self.assertEqual('(foo: 42)', str(t.shortest_prefix('foobarbaz')))
         self.assertEqual("('foo': 42)", repr(t.shortest_prefix('foobarbaz')))
+
+        self.assertEqual('(foobar: 64)', str(t.longest_prefix('foobarbaz')))
         self.assertEqual("('foobar': 64)", repr(t.longest_prefix('foobarbaz')))
-        self.assertEqual("(None Step)", repr(t.longest_prefix('qux')))
+
+        self.assertEqual('(None Step)', str(t.longest_prefix('qux')))
+        self.assertEqual('(None Step)', repr(t.longest_prefix('qux')))
+
+        steps = list(t.walk_towards('foo'))
+        self.assertEqual('(: <no value>), '
+                         '(f: <no value>), '
+                         '(fo: <no value>), '
+                         '(foo: 42)', ', '.join(map(str, steps)))
+        self.assertEqual("('': <no value>), "
+                         "('f': <no value>), "
+                         "('fo': <no value>), "
+                         "('foo': 42)", ', '.join(map(repr, steps)))
 
 
 class StringTrieTestCase(TrieTestCase):

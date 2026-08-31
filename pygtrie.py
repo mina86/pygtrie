@@ -846,8 +846,16 @@ class _Step(_t.Generic[K, V, S]):
         self._node.value = value
         return value
 
+    def __str__(self) -> str:
+        value = self.get('<no value>')
+        return f'({self.key}: {value})'
+
     def __repr__(self) -> str:
-        return '(%r: %r)' % (self.key, self.value)
+        if _is_value(self._node.value):
+            value = repr(self._node.value)
+        else:
+            value = '<no value>'
+        return f'({self.key!r}: {value})'
 
     @_t.overload
     def __getitem__(self, index: _t.Literal[0]) -> K: ...
