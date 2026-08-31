@@ -83,7 +83,7 @@ class _NoCopy:
     """Object which returns itself when copying."""
     __slots__ = ()
     def __copy__(self) -> _t.Self:
-        return self  # coverage: ignore
+        return self
     def __deepcopy__(self, memo: _t.Any) -> _t.Self:
         return self
 

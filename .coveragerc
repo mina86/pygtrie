@@ -8,6 +8,5 @@ branch = on
 exclude_lines =
     raise NotImplementedError
     -> .*: *\.\.\.(?: *#.*)?$
-    .*# coverage: ignore$
 show_missing = true
 fail_under = 95

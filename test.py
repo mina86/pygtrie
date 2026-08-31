@@ -553,6 +553,10 @@ class TrieTestCase(unittest.TestCase):
                              list(ps.iter(self._VERY_LONG_KEY)))
             self.assertEqual([], list(ps.iter(self._OTHER_KEY)))
 
+        self.assertRaises(NotImplementedError, ps.discard, self._LONG_KEY)
+        self.assertRaises(NotImplementedError, ps.remove, self._LONG_KEY)
+        self.assertRaises(NotImplementedError, ps.pop)
+
         ps.add(self._SHORT_KEY)
         self.assertTrue(ps)
         self.assertEqual(1, len(ps))
@@ -1156,6 +1160,24 @@ class MergeTest(unittest.TestCase):
              True)
         test({'foo/bar': 42, 'q/u/x': 2}, pygtrie.Trie({'qux': 2}), False)
         test({'foo/bar': 42, 'q/u/x': 2}, pygtrie.CharTrie({'qux': 2}), False)
+
+
+class NoCopyTest(unittest.TestCase):
+    """Tests _NoCopy class.  Not gonna lie.  This is here just to bump up
+    coverage.  The test case doesn’t really make much sense."""
+    # pylint: disable=protected-access
+
+    def test_singleton_values(self):
+        for v in (pygtrie._SENTINEL, pygtrie._NOVAL):
+            self.assertIs(v, copy.copy(v))
+            self.assertIs(v, copy.deepcopy(v))
+
+    def test_singleton_types(self):
+        for t in (pygtrie._FalsyIterator, pygtrie._NoChildren):
+            v = t()
+            self.assertIs(v, t())
+            self.assertIs(v, copy.copy(v))
+            self.assertIs(v, copy.deepcopy(v))
 
 
 if __name__ == '__main__':
