@@ -43,6 +43,8 @@ Features
 
 - Can store any value including None.
 
+For example usage, see scripts in ``examples`` directory.
+
 Installation
 ------------
 

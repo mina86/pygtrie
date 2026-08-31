@@ -1,6 +1,8 @@
+EXAMPLES := $(wildcard examples/*.py)
+
 all: test lint mypy coverage docs build
 
-test: pytest doctest
+test: pytest doctest examples
 
 pytest: test.py
 	if which pytest >/dev/null 2>&1; then pytest $<; else python3 $<; fi
@@ -8,11 +10,14 @@ pytest: test.py
 doctest: pygtrie.py
 	python3 -m doctest $<
 
-lint: .pylintrc pygtrie.py test.py example.py
+examples: $(EXAMPLES)
+	for ex in $(EXAMPLES); do python3 "$$ex" </dev/null || exit; done
+
+lint: .pylintrc pygtrie.py test.py $(EXAMPLES)
 	lint=$$(which pylint3 2>/dev/null) || lint=$$(which pylint) && \
 	"$$lint" --rcfile $^
 
-mypy: pygtrie.py example.py
+mypy: pygtrie.py $(EXAMPLES)
 	mypy --strict $^
 
 coverage: test.py pygtrie.py
@@ -25,4 +30,4 @@ build:
 docs:
 	python3 setup.py build_doc
 
-.PHONY: all build coverage docs doctest lint mypy pytest test
+.PHONY: all build coverage docs doctest examples lint mypy pytest test

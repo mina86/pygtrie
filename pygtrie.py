@@ -29,8 +29,6 @@ Features
 - A PrefixSet supports “all keys starting with given prefix” logic.
 
 - Can store any value including None.
-
-For a few simple examples see ``example.py`` file.
 """
 
 __author__ = 'Michał Nazarewicz <mina86@mina86.com>'
@@ -953,31 +951,15 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
     **Subclassing:** Subclasses can modify the way keys are iterated over by
     overriding :func:`_path_from_key` and :func:`_key_from_path`.  For example,
-    consider a trie whose keys are positive integers which are split into their
-    unique factors::
+    consider a trie whose keys are paths::
 
-        class FactorsTrie(pygtrie.Trie[int, V, int]):
+        class PathTrie(pygtrie.Trie[pathlib.Path, V, str]):
+            def _path_from_key(self, key: pathlib.Path) -> tuple[str, ...]:
+                return key.parts()
 
-            def _path_from_key(self, key: int) -> typing.Sequence[int]:
-                if key < 1:
-                    raise ValueError('key must be a positive integer')
-                factors = []
-                while key % 2 == 0:
-                    factors.append(2)
-                    key //= 2
-                factor = 3
-                while key > 1:
-                    while key % factor == 0:
-                        factors.append(factor)
-                        key //= factor
-                    factor += 2
-                return factors
-
-            def _key_from_path(self, path: typing.Iterable[int]) -> int:
-                n = 1
-                for factor in path:
-                    n *= factor
-                return n
+            def _key_from_path(self,
+                               path: typing.Iterable[str]) -> pathlib.Path:
+                return pathlib.Path(*path)
 
     Note on terminology: keys are converted into `paths` which are sequences of
     `steps`.  Steps correspond to labels on the trie vertices and path defines
