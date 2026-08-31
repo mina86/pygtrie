@@ -881,16 +881,72 @@ _Trace = list[tuple[S, _Node[S, V]]]
 class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     """A trie implementation with dict interface plus some extensions.
 
-    Keys used with the class must be iterables of hashable objects.  In other
-    words, for a given key, ``dict.fromkeys(key)`` must be valid expression.  In
-    particular, strings work well as keys, however getting them back (for
-    example via :func:`iterkeys` method), instead of strings, tuples of
-    characters are produced.
+    **Typing:** The class has three generic arguments: ``K``, ``V`` and
+    ``S``. ``K`` and ``V`` are the types of keys and values respectively.  Keys
+    must be iterables of hashable objects, called `steps`.  In other words, for
+    a given key, ``dict.fromkeys(key)`` must be valid expression.  ``S`` is type
+    of those steps, i.e. an item returned when iterated over the key.  For
+    example, if ``K`` is ``tuple[int, ...]`` then ``S`` needs to be ``int``.
 
-    Subclasses can modify the way keys are iterated over by overriding
-    :func:`_path_from_key` and :func:`_key_from_path`.  For example, consider
-    a trie whose keys are positive integers which are split into their unique
-    factors::
+    Due to limited expressiveness of Python’s type system, the ``S`` type has to
+    be specified explicitly and it’s possible to declare incompatible generic
+    argument combinations.  For example, ``Trie[tuple[int, ...], V, str]`` makes
+    no sense.
+
+    Furthermore, methods which return keys (e.g. :func:`keys` or
+    :func:`popitem`) always return them as ``tuple[S, ...]`` (regardless of
+    ``K``).  As a result, some combination of generic arguments may lead to
+    unsound type inference.  For example::
+
+        >>> import typing
+        >>> import pygtrie
+
+        >>> trie: pygtrie.Trie[str, bool, str] = pygtrie.Trie(foo=True)
+        >>> key: str = trie.keys()[0]
+        >>> # ‘keys` method’s declare return type is `list[K]` hence why type of
+        >>> # `trie.keys()[0]` expression is `K` which is `str` in the example.
+        >>> # However, in reality
+        >>> isinstance(key, str)
+        False
+        >>> key
+        ('f', 'o', 'o')
+
+    The problem can be solved in a few ways.  First, use ``tuple[S, ...]``,
+    ``typing.Sequence[S]`` or ``typing.Iterable[S]`` as the `K` generic
+    argument.  This is robust because all type inference remains sound.  For
+    example::
+
+        >>> t: pygtrie.Trie[typing.Sequence[str], bool, str] = pygtrie.Trie()
+        >>> t['foo'] = True
+        >>> t[('b', 'a', 'r')] = True
+        >>> keys: list[typing.Sequence[str]] = t.keys()
+        >>> print([type(key).__name__ for key in keys])
+        ['tuple', 'tuple']
+        >>> print(keys)
+        [('f', 'o', 'o'), ('b', 'a', 'r')]
+
+    Second, use an existing subclass such as :class:`CharTrie` and
+    :class:`StringTrie`.  This is best if the key is a string as the classes
+    properly convert a sequence of string steps into a single string:
+
+        >>> t: pygtrie.CharTrie[bool] = pygtrie.CharTrie(foo=True)
+        >>> key: str = t.keys()[0]
+        >>> isinstance(key, str)
+        True
+        >>> key
+        'foo'
+
+    Third, define your own subclass which does desired conversion key-steps
+    conversion.  See below for an example.
+
+    Fourth, upon getting a key from the trie, convert it to desired type.  This
+    is fragile as type inference cannot detect issues and it’s easy to forget
+    about the conversion.
+
+    **Subclassing:** Subclasses can modify the way keys are iterated over by
+    overriding :func:`_path_from_key` and :func:`_key_from_path`.  For example,
+    consider a trie whose keys are positive integers which are split into their
+    unique factors::
 
         class FactorsTrie(pygtrie.Trie[int, V, int]):
 
@@ -915,9 +971,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                     n *= factor
                 return n
 
-    :class:`CharTrie` and :class:`StringTrie` classes handle cases of iterating
-    over characters of a string and splitting string by a separator
-    respectively.
+    Note on terminology: keys are converted into `paths` which are sequences of
+    `steps`.  Steps correspond to labels on the trie vertices and path defines
+    how to get from root node to a particular node.
     """
 
     _root: _Node[S, V]
@@ -1999,7 +2055,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
             import pygtrie
 
-            t: pygtrie.StringTrie[bool] = pygtrie.StringTrie(
+            trie: pygtrie.StringTrie[bool] = pygtrie.StringTrie(
                 separator=os.sep)
 
             # Construct a trie with all files in current directory and all of
@@ -2007,7 +2063,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             # represented implicitly by being prefixes of files.
             for root, _, files in os.walk('.'):
                 for name in files:
-                    t[os.path.join(root, name)] = True
+                    trie[os.path.join(root, name)] = True
 
             def traverse_callback(
                     key_from_path: typing.Callable[[typing.Iterable[str]], str],
@@ -2024,7 +2080,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                     # Otherwise, it’s a directory.  Traverse into children.
                     return sum(children)
 
-            print(t.traverse(traverse_callback))
+            print(trie.traverse(traverse_callback))
 
         Ignoring the ``children`` argument causes subtrie to be omitted and not
         walked into.
@@ -2038,11 +2094,11 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
             import pygtrie
 
-            t: pygtrie.StringTrie[bool] = pygtrie.StringTrie(
+            trie: pygtrie.StringTrie[bool] = pygtrie.StringTrie(
                 separator=os.sep)
             for root, _, files in os.walk('.'):
                 for name in files:
-                    t[os.path.join(root, name)] = True
+                    trie[os.path.join(root, name)] = True
 
             class File:
                 name: str
@@ -2076,7 +2132,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                                  list(filter(None, children)))
 
             root_dir: Directory = typing.cast(
-                Directory, t.traverse(traverse_callback, prefix='.'))
+                Directory, trie.traverse(traverse_callback, prefix='.'))
 
         Note: Unlike iterators (e.g. returned by :func:`iteritems`), using
         ``traverse`` may raise an exception when used on a deep trie.  This may
@@ -2098,7 +2154,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             Node = collections.namedtuple('Node', 'path neighbours')
 
             def undirected_graph_from_trie(
-                    t: pygtrie.Trie[K, V, S]
+                    trie: pygtrie.Trie[K, V, S]
             ) -> list[Node]:
                 '''Converts trie into a graph and returns its nodes.'''
 
@@ -2127,7 +2183,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                             self.node.neighbours.append(self.parent)
                         return self.node
 
-                nodes: list[Node | Builder] = [t.traverse(Builder)]
+                nodes: list[Node | Builder] = [trie.traverse(Builder)]
                 i = 0
                 while i < len(nodes):
                     nodes[i] = typing.cast(Builder, nodes[i]).build(nodes)
@@ -2162,17 +2218,20 @@ class CharTrie(Trie[str, V, str]):
     example, compare::
 
         >>> import pygtrie
-        >>> t = pygtrie.Trie()
-        >>> t['foo'] = True
-        >>> t['bar'] = True
-        >>> t.keys()
+        >>> trie = pygtrie.Trie()
+        >>> trie['foo'] = True
+        >>> trie['bar'] = True
+        >>> trie.keys()
         [('f', 'o', 'o'), ('b', 'a', 'r')]
 
-        >>> t = pygtrie.CharTrie()
-        >>> t['foo'] = True
-        >>> t['bar'] = True
-        >>> t.keys()
+        >>> trie = pygtrie.CharTrie()
+        >>> trie['foo'] = True
+        >>> trie['bar'] = True
+        >>> trie.keys()
         ['foo', 'bar']
+
+    **Typing:** The class takes one generic argument ``V``.  It specifies the
+    type of values stored in the trie.  The key type is ``str``.
     """
 
     def _key_from_path(self, path: _t.Iterable[str]) -> str:
@@ -2203,6 +2262,9 @@ class StringTrie(Trie[str, V, str]):
         request_path = '/admin/images/foo'
 
         handler = handlers.longest_prefix(request_path)
+
+    **Typing:** The class takes one generic argument ``V``.  It specifies the
+    type of values stored in the trie.  The key type is ``str``.
     """
 
     def __init__(self,
@@ -2315,19 +2377,25 @@ class PrefixSet(_t.Generic[K, S], _abc.MutableSet[K]):
     The set supports addition of elements but does *not* support removal of
     elements.  This is because there’s no obvious consistent and intuitive
     behaviour for element deletion.
+
+    **Typing:** The class has two generic arguments: ``K`` and ``S``. They have
+    the same meaning and caveats as the corresponding generic arguments of the
+    :class:`Trie` class (q.v.).  To change the type of the trie backing the
+    prefix set, use ``factory`` argument of the :func:`__init__` method.
     """
 
     def __init__(self,
                  iterable: _t.Iterable[K]=(),
-                 factory: _t.Callable[..., Trie[K, bool, S]]=Trie,
+                 factory: _t.Callable[..., Trie[K, _t.Literal[True], S]]=Trie,
                  **kwargs: _t.Any):
         """Initialises the prefix set.
 
         Args:
             iterable: A sequence of keys to add to the set.
-            factory: A function used to create a trie used by the
-                    :class:`PrefixSet`.
+            factory: Callback which creates the trie backing the prefix set.
             kwargs: Additional keyword arguments passed to the factory function.
+                Notably necessary when using :class:`StringTrie` as the trie
+                backing the prefix set.
         """
         super().__init__()
         self._trie = factory(**kwargs)
