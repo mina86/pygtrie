@@ -1,6 +1,80 @@
 Version History
 ---------------
 
+2.6: 2026/09/01
+
+- Python 3.11 is now required.  Users still on 3.10 need to hold off
+  till they upgrade their Python version (3.10 is reaching end-of-life
+  in a couple months) or temporarily vendor the module and replace
+  all instances of ``_t.Self`` in ``pygtrie.py`` with ``_t.Any``.
+
+- Add type annotation to the code base.  This enables better static type
+  analysis on the code bases using pygtrie.
+
+  There are a few corner cases where the type annotations aren’t
+  entirely sound.  Most notably, the :class:`pygtrie.Trie` class always
+  returns keys as ``tuple[S, ...]`` regardless of declared type.  The
+  documentation points out ways to deal with it.
+
+  [Thanks to Dave Tapley and Avasam for requesting and discussion the
+  feature]
+
+- Deprecated and warn about some methods of :class:`pygtrie._NoneStep`
+  returned by :func:`pygtrie.Trie.shortest_prefix` and
+  :func:`pygtrie.Trie.longest_prefix` when no prefix is found.
+
+  Historically, prefixes were returned as ``(key, value)`` pairs and to
+  maintain compatibility, lack of a prefix was signalled by ``(None,
+  None)`` pair.  However, treating lack of prefix as a tuple has long
+  been deprecated:
+
+      >>> result = CharTrie(foo=42).longest_prefix('bar')
+      >>> key, value = result # Currently, (None, None);
+      >>>                     # in the future, will raise TypeError.
+      >>> key = result.key  # Currently None;
+      >>>                   # in the future will raise AttributeError.
+      >>> val = result.value  # Currently None;
+      >>>                     # in the future will raise AttributeError.
+
+  Truth value testing can be used to see whether prefix exist, and
+  :func:`pygtrie._NoneStep.get` method can be used to safely get value
+  of a prefix with a fallback if prefix isn’t valid:
+
+      >>> result = CharTrie(foo=42).longest_prefix('bar')
+      >>> if result:
+      ...     key = result.key
+      ... else:
+      ...     key = None
+      >>> value = result.get(None)
+
+  Behaviour when prefix exists remains unchanged:
+
+      >>> result = CharTrie(foo=42).longest_prefix('foobar')
+      >>> key, value = result
+      >>> assert (key, value) == ('foo', 42)
+      >>> key, value = result.key, result.value
+      >>> assert (key, value) == ('foo', 42)
+
+- Add deprecation warning to :func:`pygtrie._Step.set` method.
+  :class:`pygtrie._Step` is returned methods such as
+  :func:`pygtrie.Trie.shortest_prefix` and :func:`pygtrie.Trie.prefixes`
+  and represent a valid prefix of a key.  The method has been deprecated
+  since version 2.3.3; it’ll now issue a warning when used.  Proper way
+  to set value of a prefix is via ``value`` property, e.g.:
+
+      >>> prefix = CharTrie(foo=0, foobar=0).longest_prefix('foobarbaz')
+      >>> prefix.value += 1
+
+- Fixed :class:`pygtrie._Step` string conversion raising an exception if
+  step represents node without value.  In previous versions the
+  following would raise ``KeyError``:
+
+      >>> list(map(repr, CharTrie(a=42).walk_towards('a')))
+      ["('': <no value>)", "('a': 42)"]
+
+- Remove obsolete license classifiers from the package metadata.
+  [Thanks to Benjamin T. Schwertfeger for reporting]
+
 2.5: 2022/07/16
 
 - Add :func:`pygtrie.Trie.merge` method which merges structures of two

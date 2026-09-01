@@ -139,10 +139,9 @@ def get_readme_lines():
         cleanup_re = re.compile(r':(?:class|func|const):`([^`]*)`')
         for line in fd:
             m = version_re.search(line)
-            if m and (int(m.group(1)), int(m.group(2))) < (2, 3):
+            if m and (int(m.group(1)), int(m.group(2))) < (2, 4):
                 break
-            line, _ = cleanup_re.subn(r'``\1``', line)
-            yield line
+            yield cleanup_re.sub(r'``\1``', line)
 
 readme = ''.join(get_readme_lines()).rstrip()
 release = version.get_version()

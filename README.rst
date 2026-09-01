@@ -9,8 +9,7 @@ pygtrie
    :target: http://pygtrie.readthedocs.io/en/stable/
    :alt: Documentation build status (stable)
 
-pygtrie is a pure Python implementation of a trie data structure
-compatible with Python 2.x and Python 3.x.
+pygtrie is a pure Python implementation of a trie data structure.
 
 `Trie data structure <http://en.wikipedia.org/wiki/Trie>`_, also known
 as radix or prefix tree, is a tree associating keys to values where
