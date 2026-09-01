@@ -150,6 +150,7 @@ release = version.get_version()
 kwargs = {
     'name': 'pygtrie',
     'version': release,
+    'python_requires': '>=3.11',
     'description': 'A pure Python trie data structure implementation.',
     'long_description': readme,
     'long_description_content_type': 'text/x-rst',

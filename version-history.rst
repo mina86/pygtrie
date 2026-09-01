@@ -1,7 +1,12 @@
 Version History
 ---------------
 
-2.6: 2026/09/01
+2.6.1: 2026/09/01
+
+- Added ``python_requires`` metadata to indicate Python 3.11
+  requirement.  [Thanks to skshetry for reporting]
+
+2.6: 2026/09/01  [pulled back from PyPi]
 
 - Python 3.11 is now required.  Users still on 3.10 need to hold off
   till they upgrade their Python version (3.10 is reaching end-of-life
