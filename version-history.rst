@@ -1,9 +1,15 @@
 Version History
 ---------------
 
+2.6.2: TBD
+
+- Add missing ``py.typed`` marker file which is required for type checkers to
+  notice that the package contains type annotations.  [Thanks to Avasam for
+  reporting]
+
 2.6.1: 2026/09/01
 
-- Added ``python_requires`` metadata to indicate Python 3.11
+- Add ``python_requires`` metadata to indicate Python 3.11
   requirement.  [Thanks to skshetry for reporting]
 
 2.6: 2026/09/01  [pulled back from PyPi]
