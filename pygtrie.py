@@ -69,7 +69,7 @@ class _MakeCopy(_t.Protocol):
     different (unrelated) types over the course of a copy.
     """
 
-    def __call__(self, value: T) -> T: ...
+    def __call__(self, value: T, /) -> T: ...
 
 
 class ShortKeyError(KeyError):
@@ -138,7 +138,7 @@ class _AnyChildren(_t.Protocol[S, V]):
         """Iterates over all children as ``(step, node)`` tuples in sorted
         order."""
 
-    def get(self, step: S) -> _t.Union['_Node[S, V]', None]:
+    def get(self, step: S) -> _t.Optional['_Node[S, V]']:
         """Returns child at given step, or ``None`` if missing."""
 
     def add(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
@@ -262,7 +262,7 @@ class _OneChild(_AnyChildren[S, V]):
     def pick(self) -> tuple[S, '_Node[S, V]']:
         return (self.step, self.node)
 
-    def get(self, step: S) -> _t.Union['_Node[S, V]', None]:
+    def get(self, step: S) -> _t.Optional['_Node[S, V]']:
         return self.node if step == self.step else None
 
     def add(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
@@ -297,10 +297,10 @@ class _OneChild(_AnyChildren[S, V]):
 
     def copy(self,
              make_copy: _MakeCopy,
-             queue: list[_t.Iterable['_Node[S, V]']]) -> '_OneChild[S, V]':
+             queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
         cpy = _OneChild(make_copy(self.step), self.node.shallow_copy(make_copy))
         queue.append((cpy.node,))
-        return cpy
+        return _t.cast(_t.Self, cpy)
 
 
 class _Children(_AnyChildren[S, V]):
@@ -326,7 +326,7 @@ class _Children(_AnyChildren[S, V]):
     def pick(self) -> tuple[S, '_Node[S, V]']:
         return next(iter(self._nodes.items()))
 
-    def get(self, step: S) -> _t.Union['_Node[S, V]', None]:
+    def get(self, step: S) -> _t.Optional['_Node[S, V]']:
         return self._nodes.get(step)
 
     def __getitem__(self, step: S) -> '_Node[S, V]':
@@ -356,11 +356,11 @@ class _Children(_AnyChildren[S, V]):
 
     def copy(self,
              make_copy: _MakeCopy,
-             queue: list[_t.Iterable['_Node[S, V]']]) -> '_Children[S, V]':
+             queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
         nodes = {make_copy(step): node.shallow_copy(make_copy)
                  for step, node in self.items()}
         queue.append(nodes.values())
-        return _Children(nodes)
+        return _t.cast(_t.Self, _Children(nodes))
 
 
 class NodeFactory(_t.Protocol[K_contra, V_contra, S, T]):
@@ -384,7 +384,7 @@ class NodeFactory(_t.Protocol[K_contra, V_contra, S, T]):
                  key_from_path: _t.Callable[[_t.Iterable[S]], K_contra],
                  path: _t.Sequence[S],
                  children: _t.Iterable[T],
-                 value: V_contra=_SENTINEL,  # type: ignore[assignment]
+                 value: V_contra | _Sentinel=_SENTINEL,
                  /) -> T:
         """Processes and transforms a node of a trie.  For more details, see
         :func:`Trie.traverse`.
@@ -1478,8 +1478,14 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         Cf. :func:`has_node`."""
         return bool(self.has_node(key) & self.HAS_SUBTRIE)
 
+    # TODO(mina86): Stop quoting `slice[K, None, None]` (here and below) at some
+    # point in the far future.  AFAIU, that can happen once we require Python
+    # 3.15.  (But don’t require 3.15 just to get rid of the quoting).
+
     @staticmethod
-    def _slice_maybe(key_or_slice: K | slice) -> tuple[K, bool]:
+    def _slice_maybe(
+            key_or_slice: K | 'slice[K, None, None]'
+    ) -> tuple[K, bool]:
         """Checks whether argument is a slice or a plain key.
 
         Args:
@@ -1504,8 +1510,11 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     @_t.overload
     def __getitem__(self, key_or_slice: K) -> V: ...
     @_t.overload
-    def __getitem__(self, key_or_slice: slice) -> _t.Iterator[V]: ...
-    def __getitem__(self, key_or_slice: K | slice) -> V | _t.Iterator[V]:
+    def __getitem__(self,
+                    key_or_slice: 'slice[K, None, None]') -> _t.Iterator[V]: ...
+    def __getitem__(
+            self, key_or_slice: K | 'slice[K, None, None]'
+    ) -> V | _t.Iterator[V]:
         """Returns value associated with given key or raises :class:`KeyError`.
 
         When argument is a single key, value for that key is returned (or
@@ -1556,7 +1565,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             return value
         raise ShortKeyError(key)
 
-    def __setitem__(self, key_or_slice: K | slice, value: V) -> None:
+    def __setitem__(self,
+                    key_or_slice: K | 'slice[K, None, None]', value: V) -> None:
         """Sets value associated with given key.
 
         If ``key_or_slice`` is a key, associates it with given value.  If it is
@@ -1686,7 +1696,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         self._pop_value(trace)
         return key, value
 
-    def __delitem__(self, key_or_slice: K | slice) -> None:
+    def __delitem__(self, key_or_slice: K | 'slice[K, None, None]') -> None:
         """Deletes value associated with given key or raises KeyError.
 
         If argument is a key, value associated with it is deleted.  If the key
