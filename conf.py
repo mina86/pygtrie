@@ -61,9 +61,7 @@ copyright = u'2014-2017 by Google LLC; 2018-2026 by Michał Nazarewicz'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-with open('.gitignore') as fd:
-    exclude_patterns = fd.read().splitlines()
-exclude_patterns.append('README.rst')
+exclude_patterns = ['README.rst', 'examples/README.rst']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
