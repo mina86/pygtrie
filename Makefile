@@ -14,15 +14,15 @@ examples: $(EXAMPLES)
 	for ex in $(EXAMPLES); do python3 "$$ex" </dev/null || exit; done
 
 lint: .pylintrc pygtrie.py test.py $(EXAMPLES)
-	lint=$$(which pylint3 2>/dev/null) || lint=$$(which pylint) && \
+	lint=$$(which pylint3 2>/dev/null || which pylint) && \
 	"$$lint" --rcfile $^
 
 mypy: pygtrie.py $(EXAMPLES)
 	mypy --strict $^
 
 coverage: test.py pygtrie.py
-	python3-coverage run --source=pygtrie $< && \
-		python3-coverage report -m
+	cov=$$(which python3-coverage 2>/dev/null || which coverage) && \
+	"$$cov" run --source=pygtrie $< && "$$cov" report -m
 
 build:
 	python3 -m build -swn
