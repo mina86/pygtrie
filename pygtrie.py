@@ -114,7 +114,7 @@ class _FalsyIterator(_NoCopy):
         return False
     def __iter__(self) -> _t.Self:
         return self
-    def __next__(self) -> _t.Never:
+    def __next__(self) -> _t.NoReturn:
         raise StopIteration
 
 _FalsyIterator._FalsyIterator__instance = (  # type: ignore[attr-defined]  # pylint: disable=protected-access
@@ -2487,17 +2487,17 @@ class PrefixSet(_t.Generic[K, S], _abc.MutableSet[K]):
         # We’re friends with Trie;  pylint: disable=protected-access
         self._trie._set_node_if_no_prefix(value)
 
-    def discard(self, value: K) -> _t.Never:
+    def discard(self, value: K) -> _t.NoReturn:
         """Raises NotImplementedError."""
         raise NotImplementedError(
             'Removing values from PrefixSet is not implemented.')
 
-    def remove(self, value: K) -> _t.Never:
+    def remove(self, value: K) -> _t.NoReturn:
         """Raises NotImplementedError."""
         raise NotImplementedError(
             'Removing values from PrefixSet is not implemented.')
 
-    def pop(self) -> _t.Never:
+    def pop(self) -> _t.NoReturn:
         """Raises NotImplementedError."""
         raise NotImplementedError(
             'Removing values from PrefixSet is not implemented.')
