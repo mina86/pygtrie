@@ -38,6 +38,7 @@ __copyright__ = ('Copyright 2014-2017 Google LLC',
 
 
 import copy as _copy
+import collections as _collections
 import collections.abc as _abc
 import warnings as _warnings
 import types as _types
@@ -2316,6 +2317,179 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                              self._items_callback)
 
     traverse.uses_bool_convertible_children = True  # type: ignore[attr-defined]
+
+    def matches(self,
+                sequence: _t.Sequence[S]) -> _t.Iterable[tuple[int, int, K, V]]:
+        """Finds subsequences the sequence which match keys of the trie.
+
+        All sequences, including overlapping ones, are returned.  For example::
+
+            >>> import pygtrie
+            >>> trie = pygtrie.CharTrie({
+            ...     'A': -1,
+            ...     ' ': 0,
+            ...     'fo': 1,
+            ...     'fobr': 2,
+            ...     'fobrbz': 3,
+            ...     'br': 4
+            ... })
+            >>> sequence = 'A fobrbz affair'
+            >>> for (start, end, key, value) in trie.matches(sequence):
+            ...     print(f'[{start}:{end}]: {key!r}={value}')
+            [0:1]: 'A'=-1
+            [1:2]: ' '=0
+            [2:4]: 'fo'=1
+            [2:6]: 'fobr'=2
+            [4:6]: 'br'=4
+            [2:8]: 'fobrbz'=3
+            [8:9]: ' '=0
+
+        The method has Ο(NM) complexity where N is the number of keys in the
+        trie and M is the number of elements in the sequence.  A classic example
+        of the worst-case performance is:
+
+            >>> n = 10
+            >>> trie = pygtrie.CharTrie(('a' * i + 'b', i) for i in range(n))
+            >>> list(trie.matches('a' * n))
+            []
+
+        Args:
+            sequence: A sequence of steps to look for matches in.  The object
+                must support constant-time slice indexing,
+                i.e. ``sequence[start:end]`` operation must be supported.
+
+        Returns:
+            A generator of ``(start, end, key, value)`` tuples for all
+            subsequences of the argument which match keys in the trie.
+            ``start`` and ``end`` denote the position within the sequence that
+            the key was found.
+        """
+        return ((start, end, self._key_from_path(sequence[start:end]), value)
+                for (start, end, value) in self.value_matches(sequence))
+
+    def value_matches(
+            self,
+            sequence: _t.Iterable[S],
+    ) -> _t.Iterable[tuple[int, int, V]]:
+        """Finds subsequences of the sequence which match keys of the trie.
+
+        Does the same thing as :func:`matches` except it works with any iterable
+        and does not yield the keys.  For example::
+
+            >>> import pygtrie
+            >>> trie = pygtrie.CharTrie({
+            ...     'A': -1,
+            ...     ' ': 0,
+            ...     'fo': 1,
+            ...     'fobr': 2,
+            ...     'fobrbz': 3,
+            ...     'br': 4
+            ... })
+            >>> sequence = 'A fobrbz affair'
+            >>> for (start, end, value) in trie.value_matches(sequence):
+            ...     print(f'[{start}:{end}]: {value}')
+            [0:1]: -1
+            [1:2]: 0
+            [2:4]: 1
+            [2:6]: 2
+            [4:6]: 4
+            [2:8]: 3
+            [8:9]: 0
+
+        If keys are not necessary for the user, this is slightly more efficient
+        than :func:`matches` or :func:`imatches`.
+
+        Args:
+            sequence: An iterable of steps to look for matches in.
+
+        Yields:
+            A ``(start, end, value)`` tuples for all subsequences of the
+            argument which match keys in the trie.  ``start`` and ``end`` denote
+            the position within the sequence that the key was found.
+        """
+        cursors: list[tuple[int, _Node[S, V]]] = []
+        for pos, step in enumerate(sequence):
+            written = 0
+            cursors.append((pos, self._root))
+            for start, node in cursors:
+                n = node.children.get(step)
+                if n is None:
+                    continue
+                if _is_value(n.value):
+                    yield (start, pos + 1, n.value)
+                if n.children:
+                    cursors[written] = (start, n)
+                    written += 1
+            del cursors[written:]
+
+    def imatches(
+            self,
+            sequence: _t.Iterable[S]
+    ) -> _t.Iterable[tuple[int, int, K, V]]:
+        """Finds subsequences of the sequence which match keys of the trie.
+
+        Does the same as :func:`matches` but works with any iterable::
+
+            >>> import pygtrie
+            >>> trie = pygtrie.CharTrie({
+            ...     'A': -1,
+            ...     ' ': 0,
+            ...     'fo': 1,
+            ...     'fobr': 2,
+            ...     'fobrbz': 3,
+            ...     'br': 4
+            ... })
+            >>> iterable = iter('A fobrbz affair')
+            >>> for (start, end, key, value) in trie.imatches(iterable):
+            ...     print(f'[{start}:{end}]: {key!r}={value}')
+            [0:1]: 'A'=-1
+            [1:2]: ' '=0
+            [2:4]: 'fo'=1
+            [2:6]: 'fobr'=2
+            [4:6]: 'br'=4
+            [2:8]: 'fobrbz'=3
+            [8:9]: ' '=0
+
+        To be construct found keys, maintains additional buffer of length at
+        most the length of the longest key in the trie.  If it’s known that
+        ``sequence`` has a constant-time ``__getitem__`` method which accept
+        slice arguments, it’s better to use :func:`matches`.
+
+        Args:
+            sequence: An iterable of steps to look for matches in.
+
+        Yields:
+            A ``(start, end, key, value)`` tuples for all subsequences of the
+            argument which match keys in the trie.  ``start`` and ``end`` denote
+            the position within the sequence that the key was found.
+        """
+        path_off = 0
+        path: _collections.deque[S] = _collections.deque()
+
+        cursors: list[tuple[int, _Node[S, V]]] = []
+        for pos, step in enumerate(sequence):
+            path.append(step)
+            min_off = pos
+
+            written = 0
+            cursors.append((pos, self._root))
+            for start, node in cursors:
+                n = node.children.get(step)
+                if n is None:
+                    continue
+                if _is_value(n.value):
+                    indices = range(start - path_off, pos + 1 - path_off)
+                    key = self._key_from_path(path[idx] for idx in indices)
+                    yield (start, pos + 1, key, n.value)
+                if n.children:
+                    cursors[written] = (start, n)
+                    written += 1
+                    min_off = min(min_off, start)
+            del cursors[written:]
+
+            while path_off < min_off:
+                path.popleft()
+                path_off += 1
 
 
 class CharTrie(Trie[str, V, str]):
