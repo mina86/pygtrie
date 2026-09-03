@@ -1142,9 +1142,6 @@ class MergeTest(unittest.TestCase):
         test({'foo': 1, 'bar': 2, 'baz': 4, 'fo': 5, 'qux': 6},
              pygtrie.CharTrie({'qux': 6}))
 
-        st = pygtrie.StringTrie({'foo/bar/baz': 42})
-        self.assertRaises(TypeError, trie.merge, st)
-
     def test_merge_string_tries(self):
 
         def test(want, other, overwrite):

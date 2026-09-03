@@ -45,8 +45,8 @@ import typing as _t
 
 
 K = _t.TypeVar('K')
-V = _t.TypeVar('V')
 K_contra = _t.TypeVar('K_contra', contravariant=True)
+V = _t.TypeVar('V')
 V_contra = _t.TypeVar('V_contra', contravariant=True)
 V_co = _t.TypeVar('V_co', covariant=True)
 S = _t.TypeVar('S')
@@ -217,10 +217,11 @@ class _NoChildren(_AnyChildren[S, V], _NoCopy):
 
     require = add
 
-    def merge(self,
-              other: '_AnyChildren[S, V]',
-              queue: list[tuple['_Node[S, V]', '_Node[S, V]']],
-              ) -> '_AnyChildren[S, V]':
+    def merge(
+            self,
+            other: _AnyChildren[S, V],
+            queue: list[tuple['_Node[S, V]', '_Node[S, V]']]
+    ) -> _AnyChildren[S, V]:
         return other
 
     def copy(self,
@@ -275,10 +276,11 @@ class _OneChild(_AnyChildren[S, V]):
     def require(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
         return self.node if self.step == step else self.add(parent, step)
 
-    def merge(self,
-              other: '_AnyChildren[S, V]',
-              queue: list[tuple['_Node[S, V]', '_Node[S, V]']],
-              ) -> '_AnyChildren[S, V]':
+    def merge(
+            self,
+            other: _AnyChildren[S, V],
+            queue: list[tuple['_Node[S, V]', '_Node[S, V]']],
+    ) -> _AnyChildren[S, V]:
         # pylint: disable=unidiomatic-typecheck
         if type(other) is _OneChild and other.step == self.step:
             queue.append((self.node, other.node))
@@ -339,7 +341,7 @@ class _Children(_AnyChildren[S, V]):
         return self._nodes.setdefault(step, _Node())
 
     def merge(self,
-              other: '_AnyChildren[S, V]',
+              other: _AnyChildren[S, V],
               queue: list[tuple['_Node[S, V]', '_Node[S, V]']]) -> _t.Self:
         for step, other_node in other.items():
             node = self._nodes.setdefault(step, other_node)
@@ -1063,54 +1065,84 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         """Removes all the values from the trie."""
         self._root = _Node()
 
-    def merge(self, other: 'Trie[K, V, S]', overwrite: bool=False) -> None:
+    def merge(self, other: 'Trie[_t.Any, V, S]', overwrite: bool=False) -> None:
         """Moves nodes from other trie into this one.
 
         The merging happens at trie structure level and as such is different
         than iterating over items of one trie and setting them in the other
-        trie.
+        trie.  (For that, see :func:`Trie.update`).
 
-        The merging may happen between different types of tries resulting in
-        different (key, value) pairs in the destination trie compared to the
-        source.  For example, merging two :class:`StringTrie` objects each using
-        different separators will work as if the other trie had separator of
-        this trie.  Similarly, a :class:`CharTrie` may be merged into
-        a :class:`StringTrie` but when keys are read those will be joined by the
-        separator.  For example:
+        Merging between different types of tries may result in different ``(key,
+        value)`` pairs in the destination trie compared to the source.  For
+        example, merging two :class:`StringTrie` objects using different
+        separators will work as if the other trie had separator of this trie.
+        Similarly, a :class:`CharTrie` may be merged into a :class:`StringTrie`
+        but when keys are read those will be joined by the separator.  For
+        example:
 
             >>> import pygtrie
             >>> st = pygtrie.StringTrie(separator='.')
             >>> st.merge(pygtrie.StringTrie({'foo/bar': 42}))
             >>> list(st.items())
             [('foo.bar', 42)]
+
             >>> st.merge(pygtrie.CharTrie({'baz': 24}))
             >>> sorted(st.items())
             [('b.a.z', 24), ('foo.bar', 42)]
 
-        Not all tries can be merged into other tries.  For example,
-        a :class:`StringTrie` may not be merged into a :class:`CharTrie` because
-        the latter imposes a requirement for each component in the key to be
-        exactly one character while in the former components may be of arbitrary
-        length.
+        **Merge Compatibility:** Not all tries can be merged into other tries.
+        A :class:`StringTrie` may not be merged into a :class:`CharTrie` because
+        steps of the former (strings of arbitrary length) are incompatible with
+        steps of the latter (single-character strings).  Doing incompatible
+        merges may result in inconsistent tries, e.g. holding multiple values
+        for the same key or having inaccessible keys, for example::
 
-        Note that the other trie is cleared and any references or iterators over
-        it are invalidated.  To preserve other’s value it needs to be copied
-        first.
+            >>> import pygtrie
+            >>> ct: pygtrie.CharTrie[int] = pygtrie.CharTrie(foo=42)
+            >>> st: pygtrie.StringTrie[int] = pygtrie.StringTrie(foo=24, bar=24)
+            >>> ct.merge(st)
+            >>> ct
+            CharTrie([('foo', 42), ('foo', 24), ('bar', 24)])
+            >>> del ct['foo']
+            >>> ct
+            CharTrie([('foo', 24), ('bar', 24)])
+            >>> 'bar' in ct
+            False
+
+        For merge to be valid, the values and steps of the other trie must be
+        assignable to values and steps of this trie.  For example:
+
+        - ``CharTrie[str]`` can be merged into ``CharTrie[int | str]``, but not
+          vice versa;
+        - ``Trie[tuple[str], int, str]`` can be merged into ``Trie[tuple[str |
+          int], int, str | int]``, but not vice versa; and
+        - ``CharTrie[int]`` can be merged into ``StringTrie[int]``, but not vice
+          versa.
+
+        Following duck typing philosophy, some incompatible merges are valid.
+        For example, if steps in a :class:`StringTrie` are all one-character
+        long, it can be merged into :class:`CharTrie`.  Guaranteeing correctness
+        when merging distinct types is unfortunately on the user.
+
+        **Typing:** The type annotations of the method require value and step
+        types of the other trie be the same as of this trie.  Unfortunately,
+        this may lead to both false positives and false negatives when type
+        checking.
+
+        - The ``ct.merge(st)`` example above passes type validation, but results
+          in an inconsistent trie.  At the moment, this is something one needs
+          to be aware of, when merging tries of different types.
+        - Merging ``CharTrie[str]`` into ``CharTrie[int | str]`` is valid, but
+          it fails type validation.  At the moment, this requires
+          a :func:`~typing.cast` or ignoring of the error.
 
         Args:
-            other: Other trie to move nodes from.
+            other: Other trie to move nodes from.  The trie is empty once the
+                method returns.
             overwrite: Whether to overwrite existing values in this trie.
         """
-        if isinstance(self, type(other)):
-            self._merge_impl(self, other, overwrite=overwrite)
-        else:
-            other._merge_impl(self, other, overwrite=overwrite)  # pylint: disable=protected-access
+        self._root.merge(other._root, overwrite=overwrite)  # pylint: disable=protected-access
         other.clear()
-
-    @classmethod
-    def _merge_impl(cls, dst: _t.Self, src: _t.Self, overwrite: bool) -> None:
-        # pylint: disable=protected-access
-        dst._root.merge(src._root, overwrite=overwrite)
 
     def __copy(self, make_copy: _MakeCopy=lambda x: x) -> _t.Self:
         """Returns a shallow copy of the object.
@@ -2323,13 +2355,6 @@ class StringTrie(Trie[str, V, str]):
         for key in keys:
             trie[key] = _t.cast(V, value)
         return trie
-
-    @classmethod
-    def _merge_impl(cls, dst: _t.Self, src: _t.Self, overwrite: bool) -> None:
-        if not isinstance(dst, StringTrie):
-            raise TypeError('%s cannot be merged into a %s' % (
-                type(src).__name__, type(dst).__name__))
-        super()._merge_impl(dst, src, overwrite=overwrite)
 
     def __str__(self) -> str:
         if not self:

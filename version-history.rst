@@ -3,6 +3,16 @@ Version History
 
 2.6.2: TBD
 
+- :func:`pygtrie.Trie.merge` no longer throws :class:`TypeError` when trying to
+  merge a :class:`pygtrie.StringTrie` into a :class:`pygtrie.Trie`.
+
+  Merging can lead to inconsistent state; the check tried to prevent it.
+  However, it caught only one specific case.  Considering that the trie types
+  can be subclassed, it’s not possible to predict all possible failures.
+
+  Because of that, the explicit check was removed and corner cases and possible
+  failures better documented.
+
 - Add missing ``py.typed`` marker file which is required for type checkers to
   notice that the package contains type annotations.  [Thanks to Avasam for
   reporting]
