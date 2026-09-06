@@ -1223,7 +1223,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         # the type to make the rest of the code less noisy.  In practice, the
         # first step is never accessed and the first element is only used to
         # keep the root node.
-        return node, _t.cast(_Trace[S, V], trace)
+        return node, _t.cast('_Trace[S, V]', trace)
 
     def _set_node(self,
                   key: K,
