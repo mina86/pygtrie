@@ -298,9 +298,10 @@ class _OneChild(_AnyChildren[S, V]):
     def copy(self,
              make_copy: _MakeCopy,
              queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
-        cpy = _OneChild(make_copy(self.step), self.node.shallow_copy(make_copy))
+        cpy = type(self)(make_copy(self.step),
+                         self.node.shallow_copy(make_copy))
         queue.append((cpy.node,))
-        return _t.cast(_t.Self, cpy)
+        return cpy
 
 
 class _Children(_AnyChildren[S, V]):
@@ -360,7 +361,7 @@ class _Children(_AnyChildren[S, V]):
         nodes = {make_copy(step): node.shallow_copy(make_copy)
                  for step, node in self.items()}
         queue.append(nodes.values())
-        return _t.cast(_t.Self, _Children(nodes))
+        return type(self)(nodes)
 
 
 class NodeFactory(_t.Protocol[K_contra, V_contra, S, T]):
@@ -1209,18 +1210,16 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             KeyError: If there is no node for the key.
         """
         node = self._root
-        trace: list[tuple[S | None, _Node[S, V]]] = [(None, node)]
+        # The 0th step of the trace is never accessed.  We lie about its type to
+        # simplify the code and avoid redundant casts and checks.
+        trace: '_Trace[S, V]' = [(_t.cast(S, None), node)]
         for step in self.__path_from_key(key):
             n = node.children.get(step)
             if n is None:
                 raise KeyError(key)
             node = n
             trace.append((step, node))
-        # The first element of trace has a `None` step, but we’re lying about
-        # the type to make the rest of the code less noisy.  In practice, the
-        # first step is never accessed and the first element is only used to
-        # keep the root node.
-        return node, _t.cast(_Trace[S, V], trace)
+        return node, trace
 
     def _set_node(self,
                   key: K,
@@ -1244,12 +1243,14 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             node.value = value
         return node
 
-    def _set_node_if_no_prefix(self, key: K) -> None:
+    def _set_node_if_no_prefix(self: 'Trie[K, _t.Literal[True], S]',
+                               key: K) -> None:
         """Sets given key to True but only if none of its prefixes are present.
 
         If value is set, removes all descendants of the node.
 
-        This is a method for exclusive use by :class:`PrefixSet`.
+        This is a method for exclusive use by :class:`PrefixSet`.  It assumes
+        ``V`` generic argument of the trie is ``Literal[True]``.
 
         Args:
             key: Key to set value of.
@@ -1260,8 +1261,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             while node.value is _NOVAL:
                 node = node.children.require(node, next(steps))
         except StopIteration:
-            # This method is only used when V is bool.
-            node.value = _t.cast(V, True)
+            node.value = True
             node.children = _NoChildren()
 
     def __iter__(self) -> _t.Iterator[K]:
@@ -1500,7 +1500,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         if not isinstance(key_or_slice, slice):
             return key_or_slice, False
         elif key_or_slice.stop is None and key_or_slice.step is None:
-            return _t.cast(K, key_or_slice.start), True
+            return key_or_slice.start, True
         else:
             raise TypeError(key_or_slice)
 
@@ -1682,9 +1682,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         if not self:
             raise KeyError()
         node = self._root
-        # The first element of the trace is never accessed.  We lie about its
-        # type to simplify the code and avoid redundant casts and checks.
-        trace: _Trace[S, V] = [(_t.cast(S, None), node)]
+        # The 0th step of the trace is never accessed.  We lie about its type to
+        # simplify the code and avoid redundant casts and checks.
+        trace: '_Trace[S, V]' = [(_t.cast(S, None), node)]
         while not _is_value(value := node.value):
             # If node has no value, it must have children.
             step, node = node.children.pick()
@@ -2348,8 +2348,9 @@ class StringTrie(Trie[str, V, str]):
                 the trie.
         """
         trie = cls(separator=separator)
+        v = _t.cast(V, value)
         for key in keys:
-            trie[key] = _t.cast(V, value)
+            trie[key] = v
         return trie
 
     def __str__(self) -> str:

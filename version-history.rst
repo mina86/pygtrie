@@ -17,6 +17,9 @@ Version History
   notice that the package contains type annotations.  [Thanks to Avasam for
   reporting]
 
+- Refactor some type casting to improve trie’s lookup performance 3–5 times.
+  [Thanks to Dan Homola]
+
 2.6.1: 2026/09/01
 
 - Add ``python_requires`` metadata to indicate Python 3.11
