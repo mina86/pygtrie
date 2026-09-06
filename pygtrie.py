@@ -1167,16 +1167,12 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             return _copy.deepcopy(value, memo)
         return self.__copy(_deep_copy)
 
-    @_t.overload
-    @classmethod
-    def fromkeys(cls, keys: _t.Iterable[K]) -> 'Trie[K, V | None, S]': ...
-    @_t.overload
-    @classmethod
-    def fromkeys(cls, keys: _t.Iterable[K], value: V) -> 'Trie[K, V, S]': ...
+    # TODO(mina86): Figure out overloads which encode that `V = V | None` when
+    # called with no arguments.
     @classmethod
     def fromkeys(
             cls, keys: _t.Iterable[K], value: V | None=None
-    ) -> _t.Union['Trie[K, V, S]', 'Trie[K, V | None, S]']:
+    ) -> _t.Self:
         """Returns a new trie with given ``keys`` set to provided ``value``.
 
         This is equivalent to calling the constructor with a ``(key, value) for
@@ -1184,7 +1180,8 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
         **Typing:** Calling the method without ``value`` argument specified is
         valid only if the trie can store ``None`` values (i.e. when the trie’s
-        ``V`` generic argument accepts ``None``).
+        ``V`` generic argument accepts ``None``).  Due to Python’s type system
+        limitations, this is currently not enforced by the type annotations.
 
         Args:
             keys: An iterable of keys that should be set in the new trie.
@@ -2326,25 +2323,13 @@ class StringTrie(Trie[str, V, str]):
         self._separator = separator
         super().__init__(other, **kwargs)
 
-    @_t.overload
-    @classmethod
-    def fromkeys(cls,
-                 keys: _t.Iterable[str],
-                 *,
-                 separator: str='/') -> 'StringTrie[V | None]': ...
-    @_t.overload
-    @classmethod
-    def fromkeys(cls,
-                 keys: _t.Iterable[str],
-                 value: V,
-                 separator: str='/') -> 'StringTrie[V]': ...
     @classmethod
     def fromkeys(
             cls,
             keys: _t.Iterable[str],
             value: V | None=None,
             separator: str='/',
-    ) -> _t.Union['StringTrie[V]', 'StringTrie[V | None]']:
+    ) -> _t.Self:
         """Returns a new trie with given ``keys`` set to provided ``value``.
 
         This is equivalent to calling the constructor with a ``(key, value) for
@@ -2352,7 +2337,8 @@ class StringTrie(Trie[str, V, str]):
 
         **Typing:** Calling the method without ``value`` argument specified is
         valid only if the trie can store ``None`` values (i.e. when the trie’s
-        ``V`` generic argument accepts ``None``).
+        ``V`` generic argument accepts ``None``).  Due to Python’s type system
+        limitations, this is currently not enforced by the type annotations.
 
         Args:
             keys: An iterable of keys that should be set in the new trie.
