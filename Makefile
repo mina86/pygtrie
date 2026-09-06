@@ -10,14 +10,17 @@ pytest: test.py
 doctest: pygtrie.py
 	python3 -m doctest $<
 
+benchmark: benchmark.py
+	python3 $^
+
 examples: $(EXAMPLES)
 	for ex in $(EXAMPLES); do python3 "$$ex" </dev/null || exit; done
 
-lint: .pylintrc pygtrie.py test.py $(EXAMPLES)
+lint: .pylintrc pygtrie.py test.py benchmark.py $(EXAMPLES)
 	lint=$$(which pylint3 2>/dev/null || which pylint) && \
 	"$$lint" --rcfile $^
 
-mypy: pygtrie.py $(EXAMPLES)
+mypy: pygtrie.py benchmark.py $(EXAMPLES)
 	mypy --strict $^
 
 coverage: test.py pygtrie.py
@@ -30,4 +33,4 @@ build:
 docs:
 	python3 setup.py build_doc
 
-.PHONY: all build coverage docs doctest examples lint mypy pytest test
+.PHONY: all benchmark build coverage docs doctest examples lint mypy pytest test
