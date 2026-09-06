@@ -683,7 +683,7 @@ class _NoneStep:
         _warnings.warn(
             '_NoneStep.key will soon raise AttributeError; use `bool(step)` to'
             ' check whether step is real or _NoneStep.',
-            DeprecationWarning)
+            DeprecationWarning, stacklevel=2)
 
     @property
     def value(self) -> None:
@@ -696,7 +696,7 @@ class _NoneStep:
         _warnings.warn(
             '_NoneStep.value will soon raise AttributeError; use'
             ' `step.get(default)` to get value of a step.',
-            DeprecationWarning)
+            DeprecationWarning, stacklevel=2)
 
     @property
     def is_set(self) -> _t.Literal[False]:
@@ -738,13 +738,13 @@ class _NoneStep:
             _warnings.warn(
                 'Indexed access to _NoneStep is deprecated; use'
                 ' `bool(step)` to check whether step is real or _NoneStep.',
-                DeprecationWarning)
+                DeprecationWarning, stacklevel=2)
             return None
         if index == 1:
             _warnings.warn(
                 'Indexed access to _NoneStep is deprecated; use'
                 ' `step.get(default)` to get value of a step.',
-                DeprecationWarning)
+                DeprecationWarning, stacklevel=2)
             return None
         raise IndexError('index out of range')
 
@@ -837,7 +837,7 @@ class _Step(_t.Generic[K, V, S]):
         """**Deprecated.**  Use ``step.value = value`` instead."""
         _warnings.warn(
             '_Step.set() is deprecated; use `step.value = expr` instead.',
-            DeprecationWarning)
+            DeprecationWarning, stacklevel=2)
         self._node.value = value
 
     def setdefault(self, value: V) -> V:
