@@ -525,24 +525,22 @@ class _Node(_t.Generic[S, V]):
             _t.Iterator[tuple[S, _Node[S, V]]],
             _Children[S, V]
         ]] = []
-        while True:
-            if a.value != b.value or len(a.children) != len(b.children):
-                return False
-            # len(a.children) == len(b.children) implies they are the same type.
-
-            # Just one child.  Handle without recursion.
-            if len(a.children) == 1:
-                ac = _t.cast(_OneChild[S, V], a.children)
-                bc = _t.cast(_OneChild[S, V], b.children)
-                if ac.step != bc.step:
+        while a.value == b.value:
+            ac, bc = a.children, b.children
+            if isinstance(ac, _NoChildren):
+                if not isinstance(bc, _NoChildren):
+                    return False
+            elif isinstance(ac, _OneChild):
+                if not isinstance(bc, _OneChild) or ac.step != bc.step:
                     return False
                 a, b = ac.node, bc.node
                 continue
-
-            # Multiple children.  Append to stack.
-            if a.children:
-                stack.append((iter(a.children.items()),
-                              _t.cast(_Children[S, V], b.children)))
+            elif (isinstance(ac, _Children) and
+                  isinstance(bc, _Children) and
+                  len(ac) == len(bc)):
+                stack.append((iter(ac.items()), bc))
+            else:
+                return False
 
             while True:
                 try:
@@ -555,6 +553,8 @@ class _Node(_t.Generic[S, V]):
                     return True
                 except KeyError:
                     return False
+
+        return False
 
     def shallow_copy(self, make_copy: _MakeCopy) -> '_Node[S, V]':
         """Returns a copy of the node which shares the children property."""

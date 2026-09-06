@@ -20,6 +20,9 @@ Version History
 - Refactor some type casting to improve trie’s lookup performance 3–5 times.
   [Thanks to Dan Homola]
 
+- Optimise trie equality comparison.  The ``==`` and
+  :func:`pygtrie.Trie.strictly_equals` comparison are now around 3 times faster.
+
 2.6.1: 2026/09/01
 
 - Add ``python_requires`` metadata to indicate Python 3.11
