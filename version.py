@@ -63,12 +63,12 @@ _GIT_DESCRIPTION_RE = r'^v(?P<ver>%s)-(?P<commits>\d+)-g(?P<sha>[\da-f]+)$' % (
 def read_git_version():
     """Reads version from "git describe" command."""
     try:
-        proc = subprocess.Popen(('git', 'describe', '--long',
-                                 '--match', 'v[0-9]*.*'),
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        data, _ = proc.communicate()
-        if proc.returncode:
-            return None
+        cmd = ('git', 'describe', '--long', '--match', 'v[0-9]*.*')
+        with subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
+            data, _ = proc.communicate()
+            if proc.returncode:
+                return None
         data = data.decode(getattr(sys.stdin, 'encoding', 'ascii'))
         ver = data.splitlines()[0].strip()
     except:  # pylint: disable=bare-except
@@ -93,11 +93,8 @@ def read_git_version():
 def read_release_version(warn):
     """Reads release version from a .version file."""
     try:
-        fd = open(RELEASE_VERSION_FILE)
-        try:
+        with open(RELEASE_VERSION_FILE, encoding='ascii') as fd:
             ver = fd.readline().strip()
-        finally:
-            fd.close()
         if warn and not re.search(_PEP386_VERSION_RE, ver):
             sys.stderr.write('version: release version (%s) is invalid, '
                              'will use it anyway\n' % ver)
@@ -108,9 +105,8 @@ def read_release_version(warn):
 
 def write_release_version(version):
     """Writes release version to a .version file."""
-    fd = open(RELEASE_VERSION_FILE, 'w')
-    fd.write('%s\n' % version)
-    fd.close()
+    with open(RELEASE_VERSION_FILE, 'w', encoding='ascii') as fd:
+        fd.write('%s\n' % version)
 
 
 def get_version():
