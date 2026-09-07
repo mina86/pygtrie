@@ -124,12 +124,10 @@ _FalsyIterator._FalsyIterator__instance = (  # type: ignore[attr-defined]  # pyl
 class _AnyChildren(_t.Protocol[S, V]):
     """Protocol for node’s children.  Covers cases with no children and with
     children."""
+    __slots__ = ()
 
     def __bool__(self) -> bool:
         """Returns whether there are any children."""
-
-    def __len__(self) -> int:
-        """Returns number of children."""
 
     def items(self) -> _t.Iterable[tuple[S, '_Node[S, V]']]:
         """Iterates over all children as ``(step, node)`` tuples."""
@@ -169,9 +167,9 @@ class _AnyChildren(_t.Protocol[S, V]):
             other.children = _NoChildren()
         """
 
-    def copy(self,
-             make_copy: _MakeCopy,
-             queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
+    def clone(self,
+              make_copy: _MakeCopy,
+              queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
         """Recursively copies the current object.  ``make_copy`` is used to copy
         the step and value objects."""
 
@@ -200,8 +198,6 @@ class _NoChildren(_AnyChildren[S, V], _NoCopy):
 
     def __bool__(self) -> _t.Literal[False]:
         return False
-    def __len__(self) -> _t.Literal[0]:
-        return 0
 
     def items(self) -> tuple[()]:
         return ()
@@ -224,9 +220,9 @@ class _NoChildren(_AnyChildren[S, V], _NoCopy):
     ) -> _AnyChildren[S, V]:
         return other
 
-    def copy(self,
-             make_copy: _MakeCopy,
-             queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
+    def clone(self,
+              make_copy: _MakeCopy,
+              queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
         return self
 
     def pick(self) -> tuple[S, '_Node[S, V]']:
@@ -252,8 +248,6 @@ class _OneChild(_AnyChildren[S, V]):
 
     def __bool__(self) -> _t.Literal[True]:
         return True
-    def __len__(self) -> _t.Literal[1]:
-        return 1
 
     def items(self) -> tuple[tuple[S, '_Node[S, V]']]:
         return ((self.step, self.node),)
@@ -295,69 +289,67 @@ class _OneChild(_AnyChildren[S, V]):
     def delete(self, parent: '_Node[S, V]', step: S) -> None:
         parent.children = _NoChildren()
 
-    def copy(self,
-             make_copy: _MakeCopy,
-             queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
+    def clone(self,
+              make_copy: _MakeCopy,
+              queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
         cpy = type(self)(make_copy(self.step),
                          self.node.shallow_copy(make_copy))
         queue.append((cpy.node,))
         return cpy
 
 
-class _Children(_AnyChildren[S, V]):
-    """Children collection representing more than one child."""
+class _Children(dict[S, '_Node[S, V]'], _AnyChildren[S, V]):
+    """Children collection representing more than one child.
 
-    __slots__ = ('_nodes',)
-    _nodes: dict[S, '_Node[S, V]']
+    This class inherits from :class:`dict` but that’s only as an optimisation.
+    It must not be treated as a subclass of :class:`dict`.  In C++ nomenclature,
+    we would say the inheritance from :class:`dict` is private.  In actuality,
+    a clean design would dictate use of composition, not inheritance.
 
-    def __init__(self, nodes: dict[S, '_Node[S, V]']) -> None:
-        self._nodes = nodes
+    The optimisation that the inheritance gives us is twofold.  First, with
+    composition sizeof(dict) + sizeof(_Children) is 104 bytes; with inheritance,
+    sizeof(_Children) is 64 bytes.  Second, using inheritance removes a pointer
+    indirection improving performance.
+
+    Nevertheless, do not treat this class as subclass of :class:`dict` and only
+    methods which are defined in :class:`_AnyChildren`.
+    """
+    __slots__ = ()
 
     def __bool__(self) -> _t.Literal[True]:
         return True
-    def __len__(self) -> int:
-        return len(self._nodes)
-
-    def items(self) -> _t.Iterable[tuple[S, '_Node[S, V]']]:
-        return self._nodes.items()
 
     def sorted_items(self) -> list[tuple[S, '_Node[S, V]']]:
-        return sorted(self._nodes.items())
+        return sorted(self.items())
 
     def pick(self) -> tuple[S, '_Node[S, V]']:
-        return next(iter(self._nodes.items()))
-
-    def get(self, step: S) -> _t.Optional['_Node[S, V]']:
-        return self._nodes.get(step)
-
-    def __getitem__(self, step: S) -> '_Node[S, V]':
-        return self._nodes[step]
+        return next(iter(self.items()))
 
     def add(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
         node: '_Node[S, V]' = _Node()
-        self._nodes[step] = node
+        self[step] = node
         return node
 
     def require(self, parent: '_Node[S, V]', step: S) -> '_Node[S, V]':
-        return self._nodes.setdefault(step, _Node())
+        return self.setdefault(step, _Node())
 
     def merge(self,
               other: _AnyChildren[S, V],
               queue: list[tuple['_Node[S, V]', '_Node[S, V]']]) -> _t.Self:
         for step, other_node in other.items():
-            node = self._nodes.setdefault(step, other_node)
+            node = self.setdefault(step, other_node)
             if node is not other_node:
                 queue.append((node, other_node))
         return self
 
     def delete(self, parent: '_Node[S, V]', step: S) -> None:
-        del self._nodes[step]
+        del self[step]
         if len(self) == 1:
-            parent.children = _OneChild(*self._nodes.popitem())
+            parent.children = _OneChild(*self.popitem())
 
-    def copy(self,
-             make_copy: _MakeCopy,
-             queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
+    def clone(self,
+              make_copy: _MakeCopy,
+              queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
         nodes = {make_copy(step): node.shallow_copy(make_copy)
                  for step, node in self.items()}
         queue.append(nodes.values())
@@ -569,7 +561,7 @@ class _Node(_t.Generic[S, V]):
         queue: list[_t.Iterable['_Node[S, V]']] = [(cpy,)]
         while queue:
             for node in queue.pop():
-                node.children = node.children.copy(make_copy, queue)
+                node.children = node.children.clone(make_copy, queue)
         return cpy
 
     def __getstate__(self) -> list[int | S | V]:
