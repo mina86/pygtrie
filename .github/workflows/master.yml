@@ -1,0 +1,84 @@
+name: Test & build
+
+on:
+    push:
+        branches: [ "master" ]
+
+jobs:
+    checks:
+        name: Check ${{ matrix.node.main && '& build ' || '' }}(${{ matrix.node.python-version }}${{ matrix.node.python-freethreaded && ', freethreaded' || '' }})
+        runs-on: ubuntu-slim
+        strategy:
+            matrix:
+                node:
+                  - python-version: "3.11"
+                    main: true
+                  - python-version: "pypy3.11"
+                  - python-version: ">=3.14"
+                  - python-version: ">=3.14"
+                    python-freethreaded: true
+
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v7
+
+          - name: Set up Python ${{ matrix.node.python-version }}
+            uses: actions/setup-python@v7
+            with:
+              python-version: ${{ matrix.node.python-version }}
+              freethreaded: ${{ matrix.node.python-freethreaded || false }}
+
+          - name: Install test dependencies
+            run: |
+                python3 -m pip install -U pip
+                python3 -m pip install pytest
+
+          - name: Test
+            run: make test
+
+          - name: Install dependencies
+            if: ${{ matrix.node.main }}
+            run: python3 -m pip install coverage pylint mypy sphinx build
+
+          - name: Test coverage
+            if: ${{ matrix.node.main }}
+            background: true
+            run: make coverage
+
+          - name: Lint code
+            if: ${{ matrix.node.main }}
+            background: true
+            run: make lint
+
+          - name: Check types
+            if: ${{ matrix.node.main }}
+            background: true
+            run: make mypy
+
+          - name: Wait for checks
+            wait-all:
+
+          - name: Fill in version
+            # `make docs` and `make sphinx` need to figure out version of the
+            # package.  Normally, this is taken from git repository history, but
+            # that doesn’t work with a shallow checkout.
+            run: |
+                tag=$(git ls-remote --tags --refs origin 'refs/tags/v[0-9]*' |
+                          sed -nE 's~.*refs/tags/(v[0-9]+([.][0-9]+)+)$~\1~p' |
+                          sort -rV | head -n1)
+                ver=$tag.dev0+github
+                echo "Version: $ver"
+                echo "$ver" >.version
+
+          - name: Build documentation
+            if: ${{ matrix.node.main }}
+            background: true
+            run: make docs
+
+          - name: Build package
+            if: ${{ matrix.node.main }}
+            background: true
+            run: make build
+
+          - name: Wait for builds
+            wait-all:

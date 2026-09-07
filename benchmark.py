@@ -303,7 +303,7 @@ def bench_copy_and_merge(cps: Corpus) -> list[Result]:
     Pair = tuple[pygtrie.CharTrie[int], pygtrie.CharTrie[int]]
 
     def prepare_halfs() -> Pair:
-        tries: Pair = [pygtrie.CharTrie(), pygtrie.CharTrie()]
+        tries: Pair = (pygtrie.CharTrie(), pygtrie.CharTrie())
         for i, word in enumerate(cps.words):
             tries[i % 2][word] = i
         return tries
@@ -338,7 +338,7 @@ def bench_pickle(cps: Corpus) -> list[Result]:
 def run_corpus(path: pathlib.Path,
                sample_size: int,
                rng: random.Random) -> None:
-    print(f'\n{'=' * 72}\nCorpus: {path}')
+    print(f'\n{"=" * 72}\nCorpus: {path}')
     cps = Corpus(path, sample_size, rng)
 
     print(f'  words: {len(cps.words):,} total,'
@@ -393,14 +393,14 @@ def main(argv: typing.Sequence[str] | None=None) -> None:
     global REPEAT  # pylint: disable=global-statement
     REPEAT = args.repeat
 
-    print(f'pygtrie version: {getattr(pygtrie, '__version__', 'unknown')}')
-    print(f'python version: {sys.version.split()[0]}')
+    print('pygtrie version:', getattr(pygtrie, '__version__', 'unknown'))
+    print('python version:', sys.version.split()[0])
 
     files = args.FILE or list_test_files(TESTDATA_DIR)
     for path in files:
         run_corpus(path, args.sample_size, random.Random(args.seed))
 
-    print(f'\n{'=' * 72}\nDone.')
+    print(f'\n{"=" * 72}\nDone.')
 
 
 if __name__ == '__main__':
