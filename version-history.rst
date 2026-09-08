@@ -17,11 +17,21 @@ Version History
   notice that the package contains type annotations.  [Thanks to Avasam for
   reporting]
 
-- Refactor some type casting to improve trie’s lookup performance 3–5 times.
-  [Thanks to Dan Homola]
+- Introduce several optimisations resulting in better performance and reduced
+  memory usage.
 
-- Optimise trie equality comparison.  The ``==`` and
-  :func:`pygtrie.Trie.strictly_equals` comparison are now around 3 times faster.
+  - Refactor some types to improve trie’s lookup performance 3–5 times.  [Thanks
+    to Dan Homola]
+
+  - Optimise prefix traversal methods (:func:`pygtrie.Trie.prefixes`,
+    :func:`pygtrie.Trie.longest_prefix` etc.) resulting in 30% speed
+    improvement.
+
+  - Optimise trie equality comparison (the ``==`` operator and
+    :func:`pygtrie.Trie.strictly_equals` method) making it 3 times faster.
+
+  - Optimise memory layout of nodes resulting in 16–40 bytes memory usage
+    reduction per node and 3–10% performance improvement.
 
 2.6.1: 2026/09/01
 

@@ -1731,6 +1731,40 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     _Step: _t.TypeAlias = _Step
     _NoneStep: _t.TypeAlias = _NoneStep
 
+    def __walk_towards(
+            self,
+            key: K,
+            *,
+            only_set: bool,
+    ) -> _t.Generator[_Step[K, V, S], None, bool]:
+        """Yields nodes on the path to given node.
+
+        Args:
+            key: Key of the node to look for.
+            only_set: Whether to only yield steps corresponding to nodes
+                assigned a value.
+        Yields:
+            :class:`_Step` objects which can be used to extract or set node’s
+            value and get node’s key.
+
+            Upon termination of the generator, the :class:`StopIteration`’s
+            value specifies whether the ``key`` had been reached (i.e. if the
+            value is false, ``key`` node does not exist in the trie).
+        """
+        node = self._root
+        path = self.__path_from_key(key)
+        pos = 0
+        while True:
+            if not (only_set and node.value is _NOVAL):
+                yield _Step(self, path, pos, node)
+            if pos == len(path):
+                return True
+            n = node.children.get(path[pos])
+            if n is None:
+                return False
+            node = n
+            pos += 1
+
     def walk_towards(self, key: K) -> _t.Iterator[_Step[K, V, S]]:
         """Yields nodes on the path to given node.
 
@@ -1739,7 +1773,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
 
         Yields:
             :class:`_Step` objects which can be used to extract or set node’s
-            value as well as get node’s key.
+            value and get node’s key.
 
             When representing nodes with assigned values, the objects can be
             treated as ``(k, value)`` pairs denoting keys with associated values
@@ -1753,18 +1787,9 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                 node.  Because the method is a generator, the exception is
                 raised only once a missing node is encountered.
         """
-        node = self._root
-        path = self.__path_from_key(key)
-        pos = 0
-        while True:
-            yield _Step(self, path, pos, node)
-            if pos == len(path):
-                break
-            n = node.children.get(path[pos])
-            if n is None:
-                raise KeyError(key)
-            node = n
-            pos += 1
+        is_ok = yield from self.__walk_towards(key, only_set=False)
+        if not is_ok:
+            raise KeyError(key)
 
     def prefixes(self, key: K) -> _t.Iterator[_Step[K, V, S]]:
         """Walks towards the node specified by key and yields all found items.
@@ -1792,12 +1817,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             key.  This is deprecated, prefer using ``key`` and ``value``
             properties of the object.
         """
-        try:
-            for step in self.walk_towards(key):
-                if step.is_set:
-                    yield step
-        except KeyError:
-            pass
+        yield from self.__walk_towards(key, only_set=True)
 
     def shortest_prefix(self, key: K) -> _NoneStep | _Step[K, V, S]:
         """Finds the shortest prefix of a key with a value.
@@ -1831,7 +1851,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             value and get its key), or a :class:`_NoneStep` object (which is
             falsy value) if no prefix is found.
         """
-        return next(self.prefixes(key), _NONE_STEP)
+        return next(self.__walk_towards(key, only_set=True), _NONE_STEP)
 
     def longest_prefix(self, key: K) -> _NoneStep | _Step[K, V, S]:
         """Finds the longest prefix of a key with a value.
@@ -1866,7 +1886,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
             (which is a falsy value).
         """
         ret: _NoneStep | _Step[K, V, S] = _NONE_STEP
-        for ret in self.prefixes(key):
+        for ret in self.__walk_towards(key, only_set=True):
             pass
         return ret
 
