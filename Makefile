@@ -1,6 +1,7 @@
 EXAMPLES := $(wildcard examples/*.py)
 
 all: test lint mypy coverage docs build
+check: coverage doctest examples lint mypy
 
 test: pytest doctest examples
 
@@ -33,4 +34,5 @@ build:
 docs:
 	python3 setup.py build_doc
 
-.PHONY: all benchmark build coverage docs doctest examples lint mypy pytest test
+.PHONY: all benchmark build check coverage docs doctest examples lint mypy
+.PHony: pytest test
