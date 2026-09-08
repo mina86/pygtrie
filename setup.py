@@ -136,7 +136,8 @@ def get_readme_lines():
 
     with open('version-history.rst', encoding='utf-8') as fd:
         version_re = re.compile(r'^([0-9]+)\.([0-9]+):')
-        cleanup_re = re.compile(r':(?:class|func|const):`([^`]*)`')
+        cleanup_re = re.compile(
+            r':(?:class|func|const):`~?(?:pygtrie\.)?([^`]*)`')
         for line in fd:
             m = version_re.search(line)
             if m and (int(m.group(1)), int(m.group(2))) < (2, 4):

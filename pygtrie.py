@@ -36,6 +36,7 @@ __copyright__ = ('Copyright 2014-2017 Google LLC',
                  'Copyright 2018-2026 Michał Nazarewicz <mina86@mina86.com>')
 # __version__ = '' # set by setup.py sdist or build
 
+__all__ = ('Trie', 'CharTrie', 'StringTrie', 'PrefixSet')
 
 import copy as _copy
 import collections.abc as _abc
@@ -292,9 +293,9 @@ class _OneChild(_AnyChildren[S, V]):
     def clone(self,
               make_copy: _MakeCopy,
               queue: list[_t.Iterable['_Node[S, V]']]) -> _t.Self:
-        cpy = type(self)(make_copy(self.step),
-                         self.node.shallow_copy(make_copy))
-        queue.append((cpy.node,))
+        node = self.node.shallow_copy(make_copy)
+        cpy = type(self)(make_copy(self.step), node)
+        queue.append((node,))
         return cpy
 
 
@@ -511,12 +512,11 @@ class _Node(_t.Generic[S, V]):
     def equals(self, other: '_Node[S, V]') -> bool:
         """Returns whether this and other node are recursively equal."""
         # Like iterate, we don’t recurse so this works on deep tries.
-        a: _Node[S, V] = self
-        b: _Node[S, V] = other
-        stack: list[tuple[
+        a, b = self, other
+        stack: '''list[tuple[
             _t.Iterator[tuple[S, _Node[S, V]]],
             _Children[S, V]
-        ]] = []
+        ]]''' = []
         while a.value == b.value:
             # pylint: disable=unidiomatic-typecheck
             ac, bc = a.children, b.children
@@ -537,8 +537,9 @@ class _Node(_t.Generic[S, V]):
 
             while True:
                 try:
-                    key, a = next(stack[-1][0])
-                    b = stack[-1][1][key]
+                    l, r = stack[-1]
+                    key, a = next(l)
+                    b = r[key]
                     break
                 except StopIteration:
                     stack.pop()
@@ -559,7 +560,7 @@ class _Node(_t.Generic[S, V]):
     def copy(self, make_copy: _MakeCopy) -> '_Node[S, V]':
         """Returns a copy of the node structure."""
         cpy = self.shallow_copy(make_copy)
-        queue: list[_t.Iterable['_Node[S, V]']] = [(cpy,)]
+        queue: 'list[_t.Iterable[_Node[S, V]]]' = [(cpy,)]
         while queue:
             for node in queue.pop():
                 node.children = node.children.clone(make_copy, queue)
