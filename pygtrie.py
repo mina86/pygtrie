@@ -1499,12 +1499,16 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
     def has_key(self, key: K) -> bool:
         """Indicates whether given key has value associated with it.
         Cf. :func:`has_node`."""
-        return bool(self.has_node(key) & self.HAS_VALUE)
+        node = self._find_node(key)
+        return node is not None and node.value is not _NOVAL
 
     def has_subtrie(self, key: K) -> bool:
         """Returns whether given key is a prefix of another key in the trie.
         Cf. :func:`has_node`."""
-        return bool(self.has_node(key) & self.HAS_SUBTRIE)
+        node = self._find_node(key)
+        return node is not None and bool(node.children)
+
+    __contains__ = has_key  # type: ignore[assignment]
 
     # TODO(mina86): Stop quoting `slice[K, None, None]` (here and below) at some
     # point in the far future.  AFAIU, that can happen once we require Python
@@ -1594,6 +1598,22 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         if node is None:
             raise KeyError(key)
         raise ShortKeyError(key)
+
+    @_t.overload
+    def get(self, key: K) -> V | None: ...
+    @_t.overload
+    def get(self, key: K, default: T) -> V | T: ...
+    def get(self, key: K, default: T | None=None) -> V | T | None:
+        """Returns value associated with key, or default if not present.
+
+        Args:
+            key: The key to look for.
+            default: Value to return if key is not found.
+        """
+        node = self._find_node(key)
+        if node is not None and _is_value(value := node.value):
+            return value
+        return default
 
     def __setitem__(self,
                     key_or_slice: K | 'slice[K, None, None]', value: V) -> None:
