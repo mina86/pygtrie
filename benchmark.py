@@ -206,17 +206,24 @@ def bench_lookup(cps: Corpus, samples: typing.Sequence[str]) -> list[Result]:
                 pass
         return found
 
-    def get(container: dict[str, int] | pygtrie.CharTrie[int]) -> int:
-        get = container.get
+    def get() -> int:
+        get = cps.t.get
         return sum(get(word, 0) for word in samples)
 
+    def contains() -> int:
+        contains = cps.t.__contains__
+        return sum(contains(word) for word in samples)
+
+    def has_node() -> int:
+        has_node = cps.t.has_node
+        return sum(has_node(word) for word in samples)
+
     return [
-        bench('dict[key] (try/except)',
-              getitem, setup=lambda: cps.d, n_ops=n),
-        bench('Trie[key] (try/except)',
-              getitem, setup=lambda: cps.t, n_ops=n),
-        bench('Trie.get(key)',
-              get, setup=lambda: cps.t, n_ops=n),
+        bench('dict[key] (try/except)', getitem, setup=lambda: cps.d, n_ops=n),
+        bench('trie[key] (try/except)', getitem, setup=lambda: cps.t, n_ops=n),
+        bench('trie.get(key)', get, n_ops=n),
+        bench('key in trie', contains, n_ops=n),
+        bench('trie.has_node(key)', has_node, n_ops=n),
     ]
 
 
@@ -225,6 +232,8 @@ def bench_iteration(cps: Corpus) -> list[Result]:
         bench('dict: list(items())',
               lambda: list(cps.d.items()), n_ops=len(cps.d)),
         bench('CharTrie: items()', cps.t.items, n_ops=len(cps.t)),
+        bench('CharTrie: keys()', cps.t.keys, n_ops=len(cps.t)),
+        bench('CharTrie: values()', cps.t.values, n_ops=len(cps.t)),
         bench('CharTrie: len()', lambda: len(cps.t), n_ops=len(cps.t)),
     ]
 
@@ -236,12 +245,12 @@ def bench_equals(cps: Corpus) -> list[Result]:
         assert result
 
     return [
-        bench('CharTrie == dict', lambda: do_assert(cps.t == cps.d), n_ops=n),
-        bench('CharTrie == CharTrie',
+        bench('trie == dict', lambda: do_assert(cps.t == cps.d), n_ops=n),
+        bench('trie == trie',
               func=lambda other: do_assert(cps.t == other),
               setup=cps.t.copy,
               n_ops=n),
-        bench('CharTrie.strictly_equals',
+        bench('trie.strictly_equals',
               func=lambda other: do_assert(cps.t.strictly_equals(other)),
               setup=cps.t.copy,
               n_ops=n),
@@ -251,22 +260,27 @@ def bench_prefix_ops(cps: Corpus) -> list[Result]:
     prefixes = list(dict.fromkeys(word[:max(1, len(word) // 2)]
                                   for word in cps.samples))
 
-    def has_subtrie() -> int:
-        has_subtrie = cps.t.has_subtrie
-        return sum(has_subtrie(prefix) for prefix in prefixes)
+    def iter_prefixes_all() -> int:
+        func = cps.t.prefixes
+        return sum(1 for word in cps.samples for _ in func(word))
+
+    def walk_all() -> int:
+        func = cps.t.walk_towards
+        return sum(1 for word in cps.samples for _ in func(word))
 
     def longest_prefix() -> int:
         longest_prefix = cps.t.longest_prefix
         return sum(bool(longest_prefix(prefix)) for prefix in prefixes)
 
-    def iter_prefixes_all() -> int:
-        func = cps.t.prefixes
-        return sum(1 for word in cps.samples for _ in func(word))
+    def shortest_prefix() -> int:
+        shortest_prefix = cps.t.shortest_prefix
+        return sum(bool(shortest_prefix(prefix)) for prefix in prefixes)
 
     return [
-        bench('has_subtrie(prefix)', has_subtrie,       n_ops=len(prefixes)),
+        bench('walk_towards(word)', walk_all, n_ops=len(cps.samples)),
+        bench('prefixes(word)', iter_prefixes_all, n_ops=len(cps.samples)),
         bench('longest_prefix(prefix)', longest_prefix, n_ops=len(prefixes)),
-        bench('prefixes(word) walk', iter_prefixes_all, n_ops=len(cps.samples)),
+        bench('shortest_prefix(prefix)', shortest_prefix, n_ops=len(prefixes)),
     ]
 
 
@@ -288,8 +302,6 @@ def bench_deletion(cps: Corpus) -> list[Result]:
     return [
         bench('dict: delete all keys',
               delete, setup=cps.make_dict, n_ops=len(cps.unique)),
-        bench('dict: popitem() until empty',
-              popall, setup=cps.make_dict, n_ops=len(cps.unique)),
         bench('CharTrie: delete all keys',
               delete, setup=cps.make_trie, n_ops=len(cps.unique)),
         bench('CharTrie: popitem() until empty',
