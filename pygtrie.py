@@ -164,7 +164,7 @@ class _AnyChildren(_t.Protocol[S, V]):
         The correct usage of the method is::
 
             parent.children = parent.children.merge(other.children, queue)
-            other.children = _NoChildren()
+            other.children = _NO_CHILDREN
         """
 
     def clone(self,
@@ -231,8 +231,8 @@ class _NoChildren(_AnyChildren[S, V], _NoCopy):
     def delete(self, parent: '_Node[S, V]', step: S) -> None:
         raise NotImplementedError()
 
-_NoChildren._NoChildren__instance = (  # type: ignore[attr-defined]  # pylint: disable=protected-access
-    object.__new__(_NoChildren))
+_NO_CHILDREN = object.__new__(_NoChildren)
+_NoChildren._NoChildren__instance = _NO_CHILDREN  # type: ignore[attr-defined]  # pylint: disable=protected-access
 
 
 class _OneChild(_AnyChildren[S, V]):
@@ -287,7 +287,7 @@ class _OneChild(_AnyChildren[S, V]):
             return self
 
     def delete(self, parent: '_Node[S, V]', step: S) -> None:
-        parent.children = _NoChildren()
+        parent.children = _NO_CHILDREN
 
     def clone(self,
               make_copy: _MakeCopy,
@@ -408,7 +408,7 @@ class _Node(_t.Generic[S, V]):
     value: V | _NoValue
 
     def __init__(self) -> None:
-        self.children = _NoChildren()
+        self.children = _NO_CHILDREN
         self.value = _NOVAL
 
     def merge(self, other: '_Node[S, V]', overwrite: bool) -> None:
@@ -424,7 +424,7 @@ class _Node(_t.Generic[S, V]):
             if lhs.value is _NOVAL or (overwrite and rhs.value is not _NOVAL):
                 lhs.value = rhs.value
             lhs.children = lhs.children.merge(rhs.children, queue)
-            rhs.children = _NoChildren()
+            rhs.children = _NO_CHILDREN
 
     def iterate(
             self,
@@ -518,17 +518,18 @@ class _Node(_t.Generic[S, V]):
             _Children[S, V]
         ]] = []
         while a.value == b.value:
+            # pylint: disable=unidiomatic-typecheck
             ac, bc = a.children, b.children
-            if isinstance(ac, _NoChildren):
-                if not isinstance(bc, _NoChildren):
+            if ac is _NO_CHILDREN:
+                if bc is not _NO_CHILDREN:
                     return False
-            elif isinstance(ac, _OneChild):
-                if not isinstance(bc, _OneChild) or ac.step != bc.step:
+            elif type(ac) is _OneChild:
+                if type(bc) is not _OneChild or ac.step != bc.step:
                     return False
                 a, b = ac.node, bc.node
                 continue
-            elif (isinstance(ac, _Children) and
-                  isinstance(bc, _Children) and
+            elif (type(ac) is _Children and
+                  type(bc) is _Children and
                   len(ac) == len(bc)):
                 stack.append((iter(ac.items()), bc))
             else:
@@ -1290,7 +1291,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
                 node = node.children.require(node, next(steps))
         except StopIteration:
             node.value = True
-            node.children = _NoChildren()
+            node.children = _NO_CHILDREN
 
     def __iter__(self) -> _t.Iterator[K]:
         return self.iterkeys()
@@ -1645,7 +1646,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         key, is_slice = self._slice_maybe(key_or_slice)
         node = self._set_node(key, value)
         if is_slice:
-            node.children = _NoChildren()
+            node.children = _NO_CHILDREN
 
     @_t.overload
     def setdefault(self: 'Trie[K, V | None, S]', key: K) -> V | None: ...
@@ -1783,7 +1784,7 @@ class Trie(_t.Generic[K, V, S], _abc.MutableMapping[K, V]):
         key, is_slice = self._slice_maybe(key_or_slice)
         node, trace = self._get_node(key)
         if is_slice:
-            node.children = _NoChildren()
+            node.children = _NO_CHILDREN
         elif node.value is _NOVAL:
             raise ShortKeyError(key)
         self._pop_value(trace)
