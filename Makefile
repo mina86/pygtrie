@@ -13,6 +13,7 @@ doctest: pygtrie.py
 
 benchmark: benchmark.py
 	python3 $^
+	python3 $^ -s
 
 examples: $(EXAMPLES)
 	for ex in $(EXAMPLES); do python3 "$$ex" </dev/null || exit; done

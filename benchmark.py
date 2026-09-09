@@ -47,26 +47,35 @@ def list_test_files(path: pathlib.Path) -> list[pathlib.Path]:
             if path.is_file() and not path.name.startswith('.')]
 
 
+SomeTrie = pygtrie.CharTrie[int] | pygtrie.StringTrie[int]
+
+
 @dataclasses.dataclass(init=False)
-class Corpus:
+class Corpus:  # pylint: disable=too-many-instance-attributes
+    cls: type[SomeTrie]
     words: typing.Sequence[str]
     unique: typing.Sequence[str]
     samples: typing.Sequence[str]
     missing: typing.Sequence[str]
     d: dict[str, int]  # pylint: disable=invalid-name
-    t: pygtrie.CharTrie[int]  # pylint: disable=invalid-name
+    t: SomeTrie  # pylint: disable=invalid-name
 
     def __init__(self,
                  path: pathlib.Path,
+                 string_trie: bool,
                  sample_size: int,
                  rng: random.Random) -> None:
-        self.words = self.__load_corpus(path)
+        if string_trie:
+            self.cls = pygtrie.StringTrie[int]
+        else:
+            self.cls = pygtrie.CharTrie[int]
+        self.words = self.__load_corpus(path, string_trie)
         self.unique = tuple(
             dict.fromkeys(self.words))  # preserve first-seen order
         sample_size = min(sample_size, len(self.unique))
         self.samples = tuple(rng.sample(self.unique, sample_size))
         self.misses = self.__make_negative_samples(
-            self.unique, sample_size, rng)
+            self.unique, string_trie, sample_size, rng)
         self.d = self.make_dict()
         self.t = self.make_trie()
         assert self.t == self.d
@@ -77,32 +86,38 @@ class Corpus:
     def make_dict(self) -> dict[str, int]:
         return dict(self.__make_items())
 
-    def make_trie(self) -> pygtrie.CharTrie[int]:
-        return pygtrie.CharTrie(self.__make_items())
+    def make_trie(self) -> SomeTrie:
+        return self.cls(self.__make_items())
 
     def make_trie_all(self) -> dict[str, int]:
         return {word: idx for idx, word in enumerate(self.words)}
 
     @classmethod
-    def __load_corpus(cls, path: pathlib.Path) -> typing.Sequence[str]:
+    def __load_corpus(cls,
+                      path: pathlib.Path,
+                      string_trie: bool) -> typing.Sequence[str]:
         """Decompresses ``path`` and splits it into lowercase word tokens."""
         with lzma.open(path, 'rt', encoding='utf-8') as rd:
             text = rd.read()
-        return tuple(word.lower()
-                     for word in re.findall(r'\w+', text, re.UNICODE))
+        func = (lambda w: '/'.join(w.lower())) if string_trie else str.lower
+        return tuple(map(func, re.findall(r'\w+', text, re.UNICODE)))
 
     @classmethod
     def __make_negative_samples(cls,
                                 vocabulary: typing.Sequence[str],
+                                string_trie: bool,
                                 count: int,
                                 rng: random.Random) -> typing.Sequence[str]:
         """Returns ``count`` words that aren’t in the vocabulary."""
         vocab_set = frozenset(vocabulary)
         out: list[str] = []
         attempts = 0
+        sep = '/' if string_trie else ''
         while len(out) < count and attempts < count * 10:
             attempts += 1
-            word = rng.choice(vocabulary) + rng.choice(string.ascii_lowercase)
+            word = (rng.choice(vocabulary) +
+                    sep +
+                    rng.choice(string.ascii_lowercase))
             if word not in vocab_set:
                 out.append(word)
         return tuple(out)
@@ -164,7 +179,8 @@ def print_results(title: str, results: typing.Iterable[Result]) -> None:
 ##### Individual benchmark sections
 
 
-def bench_construction(words: typing.Sequence[str]) -> list[Result]:
+def bench_construction(cls: type[SomeTrie],
+                       words: typing.Sequence[str]) -> list[Result]:
     n = len(words)
 
     def build_dict() -> dict[str, int]:
@@ -173,30 +189,30 @@ def bench_construction(words: typing.Sequence[str]) -> list[Result]:
             d[w] = i
         return d
 
-    def build_trie() -> pygtrie.CharTrie[int]:
-        t: pygtrie.CharTrie[int] = pygtrie.CharTrie()
+    def build_trie() -> SomeTrie:
+        t: SomeTrie = cls()
         for i, w in enumerate(words):
             t[w] = i
         return t
 
-    def build_trie_from_iterator() -> pygtrie.CharTrie[int]:
-        return pygtrie.CharTrie((w, i) for i, w in enumerate(words))
+    def build_trie_from_iterator() -> SomeTrie:
+        return cls((w, i) for i, w in enumerate(words))
 
-    def build_trie_fromkeys() -> pygtrie.CharTrie[int]:
-        return pygtrie.CharTrie.fromkeys(words, 0)
+    def build_trie_fromkeys() -> SomeTrie:
+        return cls.fromkeys(words, 0)
 
     return [
         bench('dict (assign one by one)', build_dict, n_ops=n),
-        bench('CharTrie (assign one by one)', build_trie, n_ops=n),
-        bench('CharTrie (from iterator)', build_trie_from_iterator, n_ops=n),
-        bench('CharTrie.fromkeys', build_trie_fromkeys, n_ops=n),
+        bench(f'{cls.__name__}() (assign one by one)', build_trie, n_ops=n),
+        bench(f'{cls.__name__}(iter)', build_trie_from_iterator, n_ops=n),
+        bench(f'{cls.__name__}.fromkeys()', build_trie_fromkeys, n_ops=n),
     ]
 
 
 def bench_lookup(cps: Corpus, samples: typing.Sequence[str]) -> list[Result]:
     n = len(samples)
 
-    def getitem(container: dict[str, int] | pygtrie.CharTrie[int]) -> int:
+    def getitem(container: dict[str, int] | SomeTrie) -> int:
         found = 0
         get = container.__getitem__
         for word in samples:
@@ -231,10 +247,10 @@ def bench_iteration(cps: Corpus) -> list[Result]:
     return [
         bench('dict: list(items())',
               lambda: list(cps.d.items()), n_ops=len(cps.d)),
-        bench('CharTrie: items()', cps.t.items, n_ops=len(cps.t)),
-        bench('CharTrie: keys()', cps.t.keys, n_ops=len(cps.t)),
-        bench('CharTrie: values()', cps.t.values, n_ops=len(cps.t)),
-        bench('CharTrie: len()', lambda: len(cps.t), n_ops=len(cps.t)),
+        bench('trie.items()', cps.t.items, n_ops=len(cps.t)),
+        bench('trie.keys()', cps.t.keys, n_ops=len(cps.t)),
+        bench('trie.values()', cps.t.values, n_ops=len(cps.t)),
+        bench('trie.len()', lambda: len(cps.t), n_ops=len(cps.t)),
     ]
 
 
@@ -286,12 +302,12 @@ def bench_prefix_ops(cps: Corpus) -> list[Result]:
 
 def bench_deletion(cps: Corpus) -> list[Result]:
 
-    def delete(container: dict[str, int] | pygtrie.CharTrie[int]) -> None:
+    def delete(container: dict[str, int] | SomeTrie) -> None:
         delete = container.__delitem__
         for word in cps.unique:
             delete(word)
 
-    def popall(container: dict[str, int] | pygtrie.CharTrie[int]) -> None:
+    def popall(container: dict[str, int] | SomeTrie) -> None:
         pop = container.popitem
         try:
             while pop():
@@ -300,11 +316,11 @@ def bench_deletion(cps: Corpus) -> list[Result]:
             pass
 
     return [
-        bench('dict: delete all keys',
+        bench('del dict[key] for all keys',
               delete, setup=cps.make_dict, n_ops=len(cps.unique)),
-        bench('CharTrie: delete all keys',
+        bench('del trie[key] for all keys',
               delete, setup=cps.make_trie, n_ops=len(cps.unique)),
-        bench('CharTrie: popitem() until empty',
+        bench('trie.popitem() until empty',
               popall, setup=cps.make_trie, n_ops=len(cps.unique)),
     ]
 
@@ -312,7 +328,7 @@ def bench_deletion(cps: Corpus) -> list[Result]:
 def bench_copy_and_merge(cps: Corpus) -> list[Result]:
     n = len(cps.unique)
 
-    Pair = tuple[pygtrie.CharTrie[int], pygtrie.CharTrie[int]]
+    Pair = tuple[SomeTrie, SomeTrie]
 
     def prepare_halfs() -> Pair:
         tries: Pair = (pygtrie.CharTrie(), pygtrie.CharTrie())
@@ -326,8 +342,8 @@ def bench_copy_and_merge(cps: Corpus) -> list[Result]:
 
     return [
         bench('dict.copy()', cps.d.copy, n_ops=n),
-        bench('CharTrie.copy()', cps.t.copy, n_ops=n),
-        bench('CharTrie.merge()', merge, setup=prepare_halfs, n_ops=n//2),
+        bench('trie.copy()', cps.t.copy, n_ops=n),
+        bench('trie.merge()', merge, setup=prepare_halfs, n_ops=n//2),
     ]
 
 
@@ -338,8 +354,8 @@ def bench_pickle(cps: Corpus) -> list[Result]:
         bench("pickle.dumps(dict)", lambda: pickle.dumps(cps.d), n_ops=n),
         bench("pickle.loads(dict)",
               func=pickle.loads, setup=lambda: pickle.dumps(cps.d), n_ops=n),
-        bench("pickle.dumps(CharTrie)", lambda: pickle.dumps(cps.t), n_ops=n),
-        bench("pickle.loads(CharTrie)",
+        bench("pickle.dumps(trie)", lambda: pickle.dumps(cps.t), n_ops=n),
+        bench("pickle.loads(trie)",
               func=pickle.loads, setup=lambda: pickle.dumps(cps.t), n_ops=n),
     ]
 
@@ -348,10 +364,12 @@ def bench_pickle(cps: Corpus) -> list[Result]:
 
 
 def run_corpus(path: pathlib.Path,
+               string_trie: bool,
                sample_size: int,
                rng: random.Random) -> None:
-    print(f'\n{"=" * 72}\nCorpus: {path}')
-    cps = Corpus(path, sample_size, rng)
+    cls_name = 'StringTrie' if string_trie else 'CharTrie'
+    print(f'\n{"=" * 72}\nCorpus: {path}  (testing {cls_name})')
+    cps = Corpus(path, string_trie, sample_size, rng)
 
     print(f'  words: {len(cps.words):,} total,'
           f' {len(cps.unique):,} unique')
@@ -366,8 +384,10 @@ def run_corpus(path: pathlib.Path,
             formatted = f'‘{joined}’, …'
         print(f'  ex. {name}: {formatted}')
 
-    print_results('Construction (all words)',    bench_construction(cps.words))
-    print_results('Construction (unique words)', bench_construction(cps.unique))
+    print_results('Construction (all words)',
+                  bench_construction(cps.cls, cps.words))
+    print_results('Construction (unique words)',
+                  bench_construction(cps.cls, cps.unique))
     print_results('Lookup (hits)',   bench_lookup(cps, cps.samples))
     print_results('Lookup (misses)', bench_lookup(cps, cps.misses))
     print_results('Full iteration', bench_iteration(cps))
@@ -392,10 +412,12 @@ def main(argv: typing.Sequence[str] | None=None) -> None:
     parser.add_argument('FILE', nargs='*', type=pathlib.Path,
                         help=('lzma-compressed text file to benchmark.'
                               '  Defaults to the files under testdata.'))
-    parser.add_argument('--repeat', type=posint, default=5,
+    parser.add_argument('-s', '--string-trie', action='store_true',
+                        help='Test StringTrie rather than CharTrie')
+    parser.add_argument('-r', '--repeat', type=posint, default=5,
                         help=('Number of times to repeat each timing;'
                               ' default: 5'))
-    parser.add_argument('--sample-size', type=posint, default=5000,
+    parser.add_argument('-S', '--sample-size', type=posint, default=5000,
                         help=('Number of words to sample for lookup/prefix'
                               ' benchmarks; default: 5000'))
     parser.add_argument('--seed', type=int, default=0,
@@ -410,7 +432,8 @@ def main(argv: typing.Sequence[str] | None=None) -> None:
 
     files = args.FILE or list_test_files(TESTDATA_DIR)
     for path in files:
-        run_corpus(path, args.sample_size, random.Random(args.seed))
+        run_corpus(path, args.string_trie, args.sample_size,
+                   random.Random(args.seed))
 
     print(f'\n{"=" * 72}\nDone.')
 
