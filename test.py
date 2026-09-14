@@ -24,20 +24,20 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 class _TrieFactoryParameteriser:
     # pylint: disable=no-self-argument, invalid-name
 
-    def __make_update_trie_factory(update):  # pylint: disable=unused-private-member
+    def __make_update_trie_factory(update):
         def factory(trie_ctor, d):
             t = trie_ctor()
             update(t, d)
             return t
         return factory
 
-    def __setter_trie_factory(trie_ctor, d):  # pylint: disable=unused-private-member
+    def __setter_trie_factory(trie_ctor, d):
         t = trie_ctor()
         for k, v in d.items():
             t[k] = v
         return t
 
-    def __sorted_trie_factory(trie_ctor, d):  # pylint: disable=unused-private-member
+    def __sorted_trie_factory(trie_ctor, d):
         t = trie_ctor(d)
         t.enable_sorting(True)
         return t
@@ -56,13 +56,13 @@ class _TrieFactoryParameteriser:
         lambda trie_ctor, d: trie_ctor(trie_ctor(d))
     ), (
         'UpdateWithNamedArgs',
-        __make_update_trie_factory(lambda t, d: t.update(**d))  # pylint: disable=too-many-function-args
+        __make_update_trie_factory(lambda t, d: t.update(**d))
     ), (
         'UpdateWithTuples',
-        __make_update_trie_factory(lambda t, d: t.update(d.items()))  # pylint: disable=too-many-function-args
+        __make_update_trie_factory(lambda t, d: t.update(d.items()))
     ), (
         'UpdateWithDict',
-        __make_update_trie_factory(lambda t, d: t.update(d))  # pylint: disable=too-many-function-args
+        __make_update_trie_factory(lambda t, d: t.update(d))
     ), (
         'Setters',
         __setter_trie_factory
@@ -216,6 +216,8 @@ class TrieTestCase(unittest.TestCase):
 
     def _assertBasics(self, t):
         self.assertFullTrie(t)
+        self.assertRaises((TypeError, AttributeError),
+                          lambda: slice(self._SHORT_KEY, None) in t)
 
         self.assertEqual(42, t.pop(self._LONG_KEY))
         self.assertShortTrie(t)
@@ -299,6 +301,9 @@ class TrieTestCase(unittest.TestCase):
         self.assertEqual([short_key, long_key], list(t))
         self.assertEqual([short_key, long_key], t.keys())
         self.assertEqual([short_key, long_key], list(t.iterkeys()))
+
+        self.assertRaises(KeyError,
+                          lambda: list(t.iteritems(prefix=self._VERY_LONG_KEY)))
 
     def _do_test_subtrie_iterator(self, trie_factory):
         """Subtrie iterator tests"""
@@ -748,7 +753,7 @@ class CharTrieTestCase(TrieTestCase):
 
 class StringTrieTestCase(TrieTestCase):
     _TRIE_CTOR = staticmethod(
-        lambda *args, **kw: pygtrie.StringTrie(*args, separator='~', **kw))  # pylint: disable=unnecessary-lambda
+        lambda *args, **kw: pygtrie.StringTrie(*args, separator='~', **kw))
 
     _SHORT_KEY = '~home~foo'
     _SHORT_KEY2 = '~home~FOO'
@@ -905,9 +910,6 @@ class TraverseTest(unittest.TestCase):
         #      bb:4
         self.assertNode(r, '', 2)
 
-        # For some reason pylint thinks a_node et al. are strings.
-        # pylint: disable=no-member
-
         a_node = self.assertNode(r.children[0], 'a', 1)
         aa_node = self.assertNode(a_node.children[0], 'aa', 3)
         self.assertNode(aa_node.children[0], 'aaa', 0, 1)
@@ -915,6 +917,25 @@ class TraverseTest(unittest.TestCase):
 
         b_node = self.assertNode(r.children[1], 'b', 1)
         self.assertNode(b_node.children[0], 'bb', 0, 4)
+
+    def _do_test_traverse_from_prefix(self, trie_factory):
+        t = trie_factory(pygtrie.CharTrie,
+                         {'aaa': 1, 'aab': 2, 'aac': 3, 'bb': 4})
+
+        a_node = t.traverse(self._make_test_node, prefix='a')
+        # Result:
+        #  <>
+        #    a
+        #      aa:1
+        #      ab:2
+        #      ac:3
+        self.assertNode(a_node, 'a', 1)
+        aa_node = self.assertNode(a_node.children[0], 'aa', 3)
+        self.assertNode(aa_node.children[0], 'aaa', 0, 1)
+        self.assertNode(aa_node.children[2], 'aac', 0, 3)
+
+        self.assertRaises(KeyError,
+                          t.traverse, self._make_test_node, prefix='c')
 
     def _do_test_traverse_compressing(self, trie_factory):
         t = trie_factory(pygtrie.CharTrie,
@@ -937,9 +958,6 @@ class TraverseTest(unittest.TestCase):
         #    aac:3
         #  bb:4
         self.assertNode(r, '', 2)
-
-        # For some reason pylint thinks a_node et al. are strings.
-        # pylint: disable=no-member
 
         aa_node = self.assertNode(r.children[0], 'aa', 3)
         self.assertNode(aa_node.children[0], 'aaa', 0, 1)
@@ -981,7 +999,7 @@ class RecursionTest(unittest.TestCase):
     @classmethod
     def _undirected_graph_from_trie(cls, trie):
         """Converts trie into a graph and returns its nodes."""
-        Node = collections.namedtuple('Node', 'label neighbours')  # pylint: disable=invalid-name
+        Node = collections.namedtuple('Node', 'label neighbours')
 
         class Builder:
             def __init__(self, path_conv, path, children, _=None):
